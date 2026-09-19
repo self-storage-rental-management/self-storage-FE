@@ -1,6 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
 @import 'tailwindcss';
 
+/* The icon-free presentation keeps charts (Recharts SVG surfaces) visible. */
+svg:not(.recharts-surface) { display: none !important; }
+
 :root {
   --ink: #24241f;
   --ink-soft: #5f5e55;
