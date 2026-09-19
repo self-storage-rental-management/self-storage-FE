@@ -7,8 +7,9 @@ import { FACILITIES, REVENUE_TREND, CONVERSION_DATA, PRICING_TIERS, DISCOUNTS, P
 import { useLanguage } from '../../i18n/LanguageContext'
 import ProfileView from '../ProfileView'
 
+
 export default function BusinessApp({ user, onLogout }: { user: User; onLogout: () => void }) {
-  const { lang } = useLanguage()
+  const { lang, formatCurrency } = useLanguage()
 
   const NAV = [
     { id: 'facilities', label: lang === 'vi' ? 'Tổng quan cơ sở' : 'Facilities Overview', icon: Icon.building, group: lang === 'vi' ? 'Danh mục' : 'Portfolio' },
@@ -68,7 +69,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
             <StatCard title={lang === 'vi' ? 'Tổng số địa điểm' : 'Total Locations'} value={FACILITIES.length} icon={Icon.building} iconBg="bg-blue-50" />
             <StatCard title={lang === 'vi' ? 'Tổng số gian kho' : 'Total Units'} value={totalUnits} icon={Icon.box} iconBg="bg-purple-50" />
             <StatCard title={lang === 'vi' ? 'Tỷ lệ lấp đầy TB' : 'Portfolio Occupancy'} value={`${totalUnits ? Math.round(totalOccupied / totalUnits * 100) : 0}%`} icon={Icon.chart} iconBg="bg-green-50" />
-            <StatCard title={lang === 'vi' ? 'Doanh thu tháng (MTD)' : 'Total Revenue MTD'} value={`$${totalRevenue.toLocaleString()}`} icon={Icon.dollar} iconBg="bg-amber-50" />
+            <StatCard title={lang === 'vi' ? 'Doanh thu tháng (MTD)' : 'Total Revenue MTD'} value={formatCurrency(totalRevenue)} icon={Icon.dollar} iconBg="bg-amber-50" />
           </div>
           <div className="space-y-4">
             {FACILITIES.map(f => (
@@ -91,7 +92,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                         </div>
                         <div>
                           <p className="text-xs text-slate-400">{lang === 'vi' ? 'Doanh thu tháng' : 'Revenue MTD'}</p>
-                          <p className="font-semibold text-slate-800">${f.revenue.toLocaleString()}</p>
+                          <p className="font-semibold text-slate-800">{formatCurrency(f.revenue)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-slate-400">{lang === 'vi' ? 'Tăng trưởng MoM' : 'Growth MoM'}</p>
@@ -148,7 +149,9 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                     <Td>
                       {lang === 'vi' ? (
                         p.value.includes('days') ? p.value.replace('days', 'ngày') :
-                          p.value.includes('month') ? p.value.replace('month', 'tháng') : (p.value ?? '—')
+                          p.value.includes('month')
+                            ? p.value.replace('$25', '650.000 ₫').replace('month', 'tháng')
+                            : (p.value ?? '—')
                       ) : (p.value ?? '—')}
                     </Td>
 
@@ -193,11 +196,11 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-500">{lang === 'vi' ? 'Giá cơ sở' : 'Base price'}</span>
-                    <span className="font-semibold">${tier.basePrice}/{lang === 'vi' ? 'th' : 'mo'}</span>
+                    <span className="font-semibold">{formatCurrency(tier.basePrice)}/{lang === 'vi' ? 'th' : 'mo'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">{lang === 'vi' ? 'Phụ phí điều hòa' : 'Climate adder'}</span>
-                    <span className="font-semibold">+${tier.climateAdder}/{lang === 'vi' ? 'th' : 'mo'}</span>
+                    <span className="font-semibold">+{formatCurrency(tier.climateAdder)}/{lang === 'vi' ? 'th' : 'mo'}</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-100 pt-2">
                     <span className="text-slate-500">{lang === 'vi' ? 'Hệ số cao điểm' : 'High demand'}</span>
@@ -230,7 +233,10 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                               f.type.includes('Cleaning') ? 'Phí dọn vệ sinh kho' : f.type
                       ) : f.type}
                     </Td>
-                    <Td className="font-semibold text-blue-700">{f.amount}</Td>
+                    {/* <Td className="font-semibold text-blue-700">{f.amount}</Td> */}
+                    <Td className="font-semibold text-blue-700">
+                      {formatCurrency(parseFloat(f.amount.replace(/[^0-9.-]+/g, '')) || 0)}
+                    </Td>
                     <Td className="text-slate-500">
                       {lang === 'vi' ? (
                         f.trigger.includes('past due') ? 'Quá hạn thanh toán 7 ngày' :
@@ -327,7 +333,8 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
               />
               <StatCard
                 title={lang === 'vi' ? 'Ước tính ưu đãi đã trao' : 'Granted Savings Est.'}
-                value={`$${(totalRedemptions * 32).toLocaleString()}`}
+                ///value={`$${(totalRedemptions * 32).toLocaleString()}`}
+                value={formatCurrency(totalRedemptions * 32)}
                 delta={lang === 'vi' ? 'Khuyến khích khách thuê' : 'Tenant incentive'}
                 icon={Icon.dollar}
                 iconBg="bg-emerald-50 text-emerald-700"
@@ -480,10 +487,10 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
             <Tabs tabs={lang === 'vi' ? ['Toàn bộ cơ sở'] : ['All Facilities']} active={lang === 'vi' ? 'Toàn bộ cơ sở' : revenueTab} onChange={setRevenueTab} />
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard title={lang === 'vi' ? 'Doanh thu năm' : 'YTD Revenue'} value="$192,500" icon={Icon.dollar} iconBg="bg-green-50" />
-            <StatCard title={lang === 'vi' ? 'TB hàng tháng' : 'Avg Monthly'} value="$32,080" icon={Icon.chart} iconBg="bg-blue-50" />
-            <StatCard title={lang === 'vi' ? 'Tháng đỉnh điểm' : 'Best Month'} value="$35,200" icon={Icon.check} iconBg="bg-purple-50" />
-            <StatCard title={lang === 'vi' ? 'Dự báo quý tới' : 'Forecast'} value="$38,000" icon={Icon.refresh} iconBg="bg-amber-50" />
+            <StatCard title={lang === 'vi' ? 'Doanh thu năm' : 'YTD Revenue'} value={formatCurrency(192500)} icon={Icon.dollar} iconBg="bg-green-50" />
+            <StatCard title={lang === 'vi' ? 'TB hàng tháng' : 'Avg Monthly'} value={formatCurrency(32080)} icon={Icon.chart} iconBg="bg-blue-50" />
+            <StatCard title={lang === 'vi' ? 'Tháng đỉnh điểm' : 'Best Month'} value={formatCurrency(35200)} icon={Icon.check} iconBg="bg-purple-50" />
+            <StatCard title={lang === 'vi' ? 'Dự báo quý tới' : 'Forecast'} value={formatCurrency(38000)} icon={Icon.refresh} iconBg="bg-amber-50" />
           </div>
           <Card className="p-5">
             <h3 className="font-semibold text-slate-800 mb-4">{lang === 'vi' ? 'Biểu Đồ Doanh Thu Toàn Hệ Thống' : 'Revenue by Facility'}</h3>
@@ -621,7 +628,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
       <Modal open={pricingModal} onClose={() => setPricingModal(false)} title={lang === 'vi' ? 'Chỉnh Sửa Phân Tầng Giá' : 'Edit Pricing Tier'}>
         {selectedTier && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-500">{lang === 'vi' ? 'Đang chỉnh sửa:' : 'Editing:'} <strong>{selectedTier.name}</strong> ({selectedTier.size} ft)</p>
+            <p className="text-sm text-slate-500">{lang === 'vi' ? 'Đang chỉnh sửa:' : 'Editing:'} <strong>{selectedTier.name}</strong> ({selectedTier.size})</p>
             <Input label={lang === 'vi' ? 'Giá cơ sở ($/tháng)' : 'Base Price ($/mo)'} type="number" defaultValue={selectedTier.basePrice.toString()} />
             <Input label={lang === 'vi' ? 'Phụ phí điều hòa ($/tháng)' : 'Climate Control Adder ($/mo)'} type="number" defaultValue={selectedTier.climateAdder.toString()} />
             <Input label={lang === 'vi' ? 'Hệ số cao điểm' : 'High Demand Multiplier'} type="number" defaultValue={selectedTier.highDemandMultiplier.toString()} />

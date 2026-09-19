@@ -527,11 +527,44 @@ export const CONVERSION_DATA = [
   { month: 'Sep', visits: 760, bookings: 84 }
 ]
 
-export const PRICING_TIERS = [
-  { id: 'tier-1', name: 'Small Unit', size: '5 ft (25 sq ft)', basePrice: 89, climateAdder: 20, highDemandMultiplier: 1.15, facility: 'All facilities' },
-  { id: 'tier-2', name: 'Medium Unit', size: '10 ft (100 sq ft)', basePrice: 149, climateAdder: 30, highDemandMultiplier: 1.2, facility: 'All facilities' },
-  { id: 'tier-3', name: 'Large Unit', size: '20 ft (400 sq ft)', basePrice: 269, climateAdder: 45, highDemandMultiplier: 1.25, facility: 'All facilities' }
-]
+// export const PRICING_TIERS = [
+//   { id: 'tier-1', name: 'Small Unit', size: '5 ft (25 sq ft)', basePrice: 89, climateAdder: 20, highDemandMultiplier: 1.15, facility: 'All facilities' },
+//   { id: 'tier-2', name: 'Medium Unit', size: '10 ft (100 sq ft)', basePrice: 149, climateAdder: 30, highDemandMultiplier: 1.2, facility: 'All facilities' },
+//   { id: 'tier-3', name: 'Large Unit', size: '20 ft (400 sq ft)', basePrice: 269, climateAdder: 45, highDemandMultiplier: 1.25, facility: 'All facilities' }
+// ]
+
+export const PRICING_TIERS =
+  [
+    {
+      id: 'tier-1',
+      name: 'Small Unit',
+      size: '7,500,000 cm³',
+      basePrice: 89,
+      climateAdder: 20,
+      highDemandMultiplier: 1.15,
+      facility: 'All facilities'
+    },
+
+    {
+      id: 'tier-2',
+      name: 'Medium Unit',
+      size: '18,750,000 cm³',
+      basePrice: 149,
+      climateAdder: 30,
+      highDemandMultiplier: 1.2,
+      facility: 'All facilities'
+    },
+
+    {
+      id: 'tier-3',
+      name: 'Large Unit',
+      size: '60,000,000 cm³',
+      basePrice: 269,
+      climateAdder: 45,
+      highDemandMultiplier: 1.25,
+      facility: 'All facilities'
+    }
+  ];
 
 export interface PromotionItem {
   id: string
