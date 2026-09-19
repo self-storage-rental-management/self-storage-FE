@@ -1,23 +1,16 @@
 import { useState } from 'react'
 import Layout, { getInitialPage, Icon } from '../../components/Layout'
-import { Badge, Button, Card, StatCard, Table, Thead, Tbody, Th, Td, Tr, SectionHeader, Modal, Tabs, Avatar } from '../../components/ui'
+import { Badge, Button, Card, StatCard, Table, Thead, Tbody, Th, Td, Tr, SectionHeader, Modal, Tabs, Avatar, Input } from '../../components/ui'
 import ProfileView from '../ProfileView'
 import { useLanguage } from '../../i18n/LanguageContext'
 import type { User } from '../../types'
-import { TASKS, RESERVATIONS, CHECKINS, RETURNS, SUPPORT_TICKETS } from "../../data/demoDatabase"
-
-const taskTitleVi: Record<string, string> = {
-  't1': 'Kiểm tra hệ thống cảm biến nhiệt độ & độ ẩm Tầng 2',
-  't2': 'Nghiệm thu kho B-04 chuẩn bị thủ tục trả kho cho khách',
-  't3': 'Hỗ trợ khách hàng đổi mã PIN và kích hoạt thẻ từ cổng',
-  't4': 'Đi tuần tra kiểm tra an ninh toàn bộ khuôn viên kho',
-  't5': 'Rà soát danh sách chốt khóa kho nợ quá hạn'
-}
+import { RESERVATIONS, CHECKINS, RETURNS, SUPPORT_TICKETS } from "../../data/demoDatabase"
 
 const statusLabelMap: Record<string, Record<string, string>> = {
   vi: {
     confirmed: 'Đã xác nhận',
     pending: 'Chờ duyệt',
+    rejected: 'Đã từ chối',
     completed: 'Hoàn tất',
     scheduled: 'Đã lên lịch',
     'pending-payment': 'Chờ thanh toán',
@@ -34,6 +27,7 @@ const statusLabelMap: Record<string, Record<string, string>> = {
   en: {
     confirmed: 'Confirmed',
     pending: 'Pending',
+    rejected: 'Rejected',
     completed: 'Completed',
     scheduled: 'Scheduled',
     'pending-payment': 'Pending Payment',
@@ -53,6 +47,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
   const { lang, t } = useLanguage()
 
   const NAV = [
+    { id: 'dashboard', label: lang === 'vi' ? 'Tổng quan ca làm việc' : 'Staff Dashboard', icon: Icon.home, group: lang === 'vi' ? 'Ca làm việc' : 'Work Queue' },
     { id: 'tasks', label: lang === 'vi' ? 'Nhiệm vụ trong ngày' : 'Daily Tasks', icon: Icon.tasks, group: lang === 'vi' ? 'Ca làm việc' : 'Work Queue' },
     { id: 'reservations', label: lang === 'vi' ? 'Xác nhận đặt kho' : 'Reservations', icon: Icon.calendar, group: lang === 'vi' ? 'Dịch vụ khách hàng' : 'Customer Service' },
     { id: 'checkin', label: lang === 'vi' ? 'Bàn giao & Nhận kho' : 'Check-in / Handover', icon: Icon.truck, group: lang === 'vi' ? 'Dịch vụ khách hàng' : 'Customer Service' },
@@ -60,8 +55,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
     { id: 'support', label: lang === 'vi' ? 'Hỗ trợ khách hàng' : 'Support Tickets', icon: Icon.support, group: lang === 'vi' ? 'Chăm sóc & Hỗ trợ' : 'Support' },
   ]
 
-  const [page, setPage] = useState(() => getInitialPage(NAV, 'tasks'))
-  const [tasks, setTasks] = useState(TASKS)
+  const [page, setPage] = useState(() => getInitialPage(NAV, 'dashboard'))
   const [reservations, setReservations] = useState(RESERVATIONS)
   const [checkins, setCheckins] = useState(CHECKINS)
   const [returns, setReturns] = useState(RETURNS)
@@ -72,6 +66,22 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
   const [selectedReturn, setSelectedReturn] = useState<typeof RETURNS[0] | null>(null)
   const [selectedCheckin, setSelectedCheckin] = useState<typeof CHECKINS[0] | null>(null)
   const [ticketTab, setTicketTab] = useState('Open')
+  const [reservationSearch, setReservationSearch] = useState('')
+  const [reservationStatus, setReservationStatus] = useState('all')
+  const [scheduledReturnIds, setScheduledReturnIds] = useState<Set<string>>(new Set())
+  const [returnScheduleDrafts, setReturnScheduleDrafts] = useState<Record<string, string>>({})
+  const [checkinChecks, setCheckinChecks] = useState<Record<string, boolean>>({})
+  const [checkinEvidence, setCheckinEvidence] = useState('')
+  const [checkinNotes, setCheckinNotes] = useState('')
+  const [actualDimensions, setActualDimensions] = useState('')
+  const [actualWeight, setActualWeight] = useState('')
+  const [actualMaterial, setActualMaterial] = useState('')
+  const [actualCondition, setActualCondition] = useState('')
+  const [returnInventory, setReturnInventory] = useState('match')
+  const [returnClassification, setReturnClassification] = useState('no-damage')
+  const [returnEvidence, setReturnEvidence] = useState('')
+  const [returnNotes, setReturnNotes] = useState('')
+  const [returnConfirmed, setReturnConfirmed] = useState(false)
 
   // Support Tickets state
   const [staffTickets, setStaffTickets] = useState(SUPPORT_TICKETS)
@@ -79,6 +89,9 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
   const [respondModal, setRespondModal] = useState(false)
   const [staffReplyText, setStaffReplyText] = useState('')
   const [ticketNewStatus, setTicketNewStatus] = useState<'open' | 'in-progress' | 'resolved'>('in-progress')
+  const [ticketEvidence, setTicketEvidence] = useState('')
+  const [ticketEscalated, setTicketEscalated] = useState(false)
+  const [ticketEscalationReason, setTicketEscalationReason] = useState('')
   const [toast, setToast] = useState<string | null>(null)
 
   const showToast = (msg: string) => {
@@ -91,8 +104,21 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
     return <Badge variant={map[v] ?? 'muted'}>{label}</Badge>
   }
 
-  const completedCount = tasks.filter(t => t.done).length
-  const totalCount = tasks.length
+  const normalizedSearch = reservationSearch.trim().toLowerCase()
+  const priorityRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
+  const filteredReservations = reservations.filter(r => {
+    const matchesStatus = reservationStatus === 'all' || r.status === reservationStatus
+    const searchText = [r.id, r.customer, r.phone, r.email, r.identityId, r.facility, r.unit].join(' ').toLowerCase()
+    return matchesStatus && (!normalizedSearch || searchText.includes(normalizedSearch))
+  })
+  const operationalTasks = [
+    ...reservations.filter(r => r.status === 'pending').map(r => ({ id: `review-${r.id}`, title: lang === 'vi' ? `Duyệt ngoại lệ ${r.id}` : `Review exception ${r.id}`, customer: r.customer, time: r.moveIn, sla: lang === 'vi' ? 'SLA duyệt: 15 phút' : '15-minute review SLA', priority: 'high', page: 'reservations' })),
+    ...checkins.filter(c => c.status !== 'completed').map(c => ({ id: `checkin-${c.id}`, title: lang === 'vi' ? `Check-in & bàn giao ${c.unit}` : `Check-in & handover ${c.unit}`, customer: c.customer, time: `${c.date} ${c.time}`, sla: lang === 'vi' ? 'Theo lịch hẹn' : 'Appointment', priority: 'medium', page: 'checkin' })),
+    ...returns.filter(r => r.status !== 'refunded').map(r => ({ id: `return-${r.id}`, title: lang === 'vi' ? `Kiểm tra trả kho ${r.unit}` : `Return inspection ${r.unit}`, customer: r.customer, time: returnScheduleDrafts[r.id] || r.returnDate, sla: scheduledReturnIds.has(r.id) ? (lang === 'vi' ? 'Đã xác nhận lịch' : 'Scheduled') : (lang === 'vi' ? 'Cần xác nhận lịch' : 'Schedule required'), priority: scheduledReturnIds.has(r.id) ? 'medium' : 'high', page: 'return' })),
+    ...staffTickets.filter(ticket => ticket.status !== 'resolved').map(ticket => ({ id: `support-${ticket.id}`, title: lang === 'vi' ? `Xử lý hỗ trợ ${ticket.id}` : `Handle support ${ticket.id}`, customer: ticket.customer, time: ticket.created, sla: ticket.priority === 'high' ? (lang === 'vi' ? 'Xử lý ngay' : 'Immediate') : (lang === 'vi' ? 'Trong ca' : 'Within shift'), priority: ticket.priority, page: 'support' }))
+  ].sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority])
+  const totalCount = operationalTasks.length
+  const completedCount = reservations.filter(r => r.status === 'confirmed').length + checkins.filter(c => c.status === 'completed').length + returns.filter(r => r.status === 'inspected' || r.status === 'refunded').length + staffTickets.filter(ticket => ticket.status === 'resolved').length
 
 
   return (
@@ -100,6 +126,28 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
       user={user} navItems={NAV} currentPage={page} onNavigate={setPage} onLogout={onLogout}
       roleLabel="Staff" roleColor="bg-green-100 text-green-700"
     >
+      {page === 'dashboard' && (
+        <div className="fade-in space-y-6">
+          <SectionHeader
+            eyebrow={lang === 'vi' ? 'CỔNG NHÂN VIÊN · TỔNG QUAN VẬN HÀNH' : 'STAFF PORTAL · OPERATIONS OVERVIEW'}
+            title={lang === 'vi' ? 'Tổng Quan Ca Làm Việc' : 'Staff Home / Dashboard'}
+            subtitle={`${user.facility ?? (lang === 'vi' ? 'Cơ sở được phân quyền' : 'Authorized facility')} · ${new Date().toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US')}`}
+          />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard title={lang === 'vi' ? 'Ngoại lệ chờ duyệt' : 'Exception Reviews'} value={reservations.filter(r => r.status === 'pending').length} icon={Icon.alert} iconBg="bg-amber-50" />
+            <StatCard title={lang === 'vi' ? 'Check-in sắp tới' : 'Upcoming Check-ins'} value={checkins.filter(c => c.status !== 'completed').length} icon={Icon.truck} iconBg="bg-blue-50" />
+            <StatCard title={lang === 'vi' ? 'Trả kho cần xử lý' : 'Returns to Process'} value={returns.filter(r => r.status !== 'refunded').length} icon={Icon.clipboard} iconBg="bg-purple-50" />
+            <StatCard title={lang === 'vi' ? 'Hỗ trợ đang mở' : 'Open Support Cases'} value={staffTickets.filter(ticket => ticket.status !== 'resolved').length} icon={Icon.support} iconBg="bg-red-50" />
+          </div>
+          <Card>
+            <div className="p-4 border-b border-stone-200 flex items-center justify-between gap-3"><div><h3 className="font-bold">{lang === 'vi' ? 'Việc ưu tiên theo SLA' : 'Priority Tasks by SLA'}</h3><p className="text-xs text-stone-500">{lang === 'vi' ? 'Ngoại lệ, lịch nhận/trả kho và hỗ trợ cần xử lý.' : 'Exceptions, check-ins, returns and support requiring action.'}</p></div><Button variant="outline" size="sm" onClick={() => setPage('tasks')}>{lang === 'vi' ? 'Xem toàn bộ' : 'View all'}</Button></div>
+            <Table><Thead><tr><Th>{lang === 'vi' ? 'Ưu tiên' : 'Priority'}</Th><Th>{lang === 'vi' ? 'Nhiệm vụ' : 'Task'}</Th><Th>{lang === 'vi' ? 'Khách hàng' : 'Customer'}</Th><Th>{lang === 'vi' ? 'Lịch / SLA' : 'Schedule / SLA'}</Th><Th></Th></tr></Thead><Tbody>
+              {operationalTasks.slice(0, 6).map(task => <Tr key={task.id}><Td>{s(task.priority, { high: 'error', medium: 'warning', low: 'muted' })}</Td><Td><b>{task.title}</b><p className="text-[11px] text-stone-400">{task.id}</p></Td><Td>{task.customer}</Td><Td><p className="text-xs">{task.time}</p><p className="text-[11px] font-semibold text-amber-700">{task.sla}</p></Td><Td className="text-right"><Button size="sm" variant="outline" onClick={() => setPage(task.page)}>{lang === 'vi' ? 'Xử lý' : 'Open'}</Button></Td></Tr>)}
+            </Tbody></Table>
+          </Card>
+        </div>
+      )}
+
       {/* ── DAILY TASKS ───────────────────────────────────────── */}
       {page === 'tasks' && (
         <div className="fade-in">
@@ -112,29 +160,12 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <StatCard title={t('tasks.total', 'Total Tasks')} value={totalCount} icon={Icon.tasks} iconBg="bg-blue-50" />
             <StatCard title={t('tasks.completed', 'Completed')} value={completedCount} icon={Icon.check} iconBg="bg-green-50" />
-            <StatCard title={t('tasks.remaining', 'Remaining')} value={totalCount - completedCount} icon={Icon.alert} iconBg="bg-amber-50" />
+            <StatCard title={t('tasks.remaining', 'Remaining')} value={Math.max(0, totalCount)} icon={Icon.alert} iconBg="bg-amber-50" />
           </div>
 
-          <Card className="divide-y divide-slate-100">
-            {tasks.map(tItem => (
-              <div key={tItem.id} className={`flex items-center gap-4 p-4 ${tItem.done ? 'opacity-50' : ''}`}>
-                <button
-                  onClick={() => setTasks(ts => ts.map(tt => tt.id === tItem.id ? { ...tt, done: !tt.done } : tt))}
-                  className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${tItem.done ? 'bg-green-500 border-green-500' : 'border-slate-300 hover:border-blue-400'
-                    }`}
-                >
-                  {tItem.done && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${tItem.done ? 'line-through text-slate-400' : 'text-slate-800'}`}>
-                    {lang === 'vi' && taskTitleVi[tItem.id] ? taskTitleVi[tItem.id] : tItem.title}
-                  </p>
-                  <p className="text-xs text-slate-400">{tItem.time}</p>
-                </div>
-                {s(tItem.priority, { high: 'error', medium: 'warning', low: 'muted' })}
-              </div>
-            ))}
-          </Card>
+          <Card><Table><Thead><tr><Th>{lang === 'vi' ? 'Nhiệm vụ được giao' : 'Assigned Task'}</Th><Th>{lang === 'vi' ? 'Khách hàng' : 'Customer'}</Th><Th>{lang === 'vi' ? 'Lịch' : 'Schedule'}</Th><Th>SLA</Th><Th>{lang === 'vi' ? 'Ưu tiên' : 'Priority'}</Th><Th></Th></tr></Thead><Tbody>
+            {operationalTasks.map(task => <Tr key={task.id}><Td><b>{task.title}</b></Td><Td>{task.customer}</Td><Td className="text-xs">{task.time}</Td><Td className="text-xs font-semibold text-amber-700">{task.sla}</Td><Td>{s(task.priority, { high: 'error', medium: 'warning', low: 'muted' })}</Td><Td className="text-right"><Button size="sm" variant="outline" onClick={() => setPage(task.page)}>{lang === 'vi' ? 'Mở hồ sơ' : 'Open record'}</Button></Td></Tr>)}
+          </Tbody></Table></Card>
         </div>
       )}
 
@@ -142,9 +173,10 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
       {page === 'reservations' && (
         <div className="fade-in">
           <SectionHeader
-            title={t('reservations.title', 'Reservation Verification')}
-            subtitle={t('reservations.subtitle', 'Review and confirm incoming reservations')}
+            title={lang === 'vi' ? 'Tìm Kiếm & Duyệt Ngoại Lệ Đặt Kho' : 'Search Reservations & Review Exceptions'}
+            subtitle={lang === 'vi' ? 'Tìm theo mã, khách hàng, điện thoại, email, CCCD, cơ sở hoặc kho; chỉ hồ sơ chờ duyệt mới có thao tác phê duyệt.' : 'Search by code, customer, phone, email, ID, facility or unit; approval actions are limited to pending reviews.'}
           />
+          <Card className="p-4 mb-4"><div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-3"><Input label={lang === 'vi' ? 'Tìm hồ sơ' : 'Search records'} value={reservationSearch} onChange={event => setReservationSearch(event.target.value)} placeholder={lang === 'vi' ? 'Mã đơn, tên, SĐT, email, CCCD, cơ sở, mã kho' : 'Code, name, phone, email, ID, facility, unit'} /><div><label className="text-sm font-medium text-stone-700">{lang === 'vi' ? 'Trạng thái' : 'Status'}</label><select value={reservationStatus} onChange={event => setReservationStatus(event.target.value)} className="mt-1 w-full border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="all">{lang === 'vi' ? 'Tất cả' : 'All'}</option><option value="pending">{lang === 'vi' ? 'Chờ duyệt ngoại lệ' : 'Review required'}</option><option value="confirmed">{lang === 'vi' ? 'Đã duyệt' : 'Approved'}</option><option value="rejected">{lang === 'vi' ? 'Đã từ chối' : 'Rejected'}</option></select></div></div><p className="mt-2 text-xs text-stone-500">{filteredReservations.length}/{reservations.length} {lang === 'vi' ? 'hồ sơ phù hợp' : 'matching records'}</p></Card>
           <Card>
             <Table>
               <Thead>
@@ -159,7 +191,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                 </tr>
               </Thead>
               <Tbody>
-                {reservations.map(r => (
+                {filteredReservations.map(r => (
                   <Tr key={r.id}>
                     <Td><span className="font-mono text-xs text-slate-500">{r.id}</span></Td>
                     <Td>
@@ -181,14 +213,18 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                     <Td>
                       <div className="flex gap-1.5">
                         <Button variant="outline" size="sm" onClick={() => { setSelectedReservation(r); setReservationModal(true) }}>{t('reservations.view', 'View')}</Button>
-                        {r.status === 'pending' && <Button variant="primary" size="sm" onClick={() => {
+                        {r.status === 'pending' && <><Button variant="danger" size="sm" onClick={() => {
+                          setReservations(items => items.map(item => item.id === r.id ? { ...item, status: 'rejected', evidence: [...item.evidence, `STAFF-${Date.now()} · ${user.name} từ chối ngoại lệ và giải phóng kho`] } : item))
+                          showToast(lang === 'vi' ? 'Đã từ chối ngoại lệ và giải phóng vị trí kho.' : 'Exception rejected and unit released.')
+                        }}>{lang === 'vi' ? 'Từ chối' : 'Reject'}</Button><Button variant="primary" size="sm" onClick={() => {
                           setReservations(items => items.map(item => item.id === r.id ? { ...item, status: 'confirmed', evidence: [...item.evidence, `STAFF-${Date.now()} · ${user.name} xác nhận giữ kho`] } : item))
                           showToast(lang === 'vi' ? 'Đã xác nhận yêu cầu giữ kho; không ký thay khách hàng.' : 'Storage hold confirmed; no contract was signed on the customer’s behalf.')
-                        }}>{lang === 'vi' ? 'Xác nhận giữ kho' : 'Confirm hold'}</Button>}
+                        }}>{lang === 'vi' ? 'Phê duyệt' : 'Approve'}</Button></>}
                       </div>
                     </Td>
                   </Tr>
                 ))}
+                {filteredReservations.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-stone-500">{lang === 'vi' ? 'Không có hồ sơ phù hợp.' : 'No matching reservations.'}</td></tr>}
               </Tbody>
             </Table>
           </Card>
@@ -220,7 +256,17 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                   <div className="flex items-center gap-3">
                     {s(c.status, { scheduled: 'info', 'pending-payment': 'warning', completed: 'success' })}
                     {c.status !== 'completed' && (
-                      <Button variant="primary" size="sm" onClick={() => { setSelectedCheckin(c); setCheckinModal(true) }}>
+                      <Button variant="primary" size="sm" onClick={() => {
+                        setSelectedCheckin(c)
+                        setCheckinChecks({ identity: false, reservation: false, payment: c.status !== 'pending-payment', measurement: false, condition: false, credential: false, customer: false })
+                        setActualDimensions(c.dimensionsCm)
+                        setActualWeight(String(c.weightKg))
+                        setActualMaterial(c.material)
+                        setActualCondition(c.initialCondition)
+                        setCheckinEvidence('')
+                        setCheckinNotes('')
+                        setCheckinModal(true)
+                      }}>
                         {t('checkin.process', 'Process Check-in')}
                       </Button>
                     )}
@@ -266,7 +312,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                       </div>
                     </Td>
                     <Td className="font-medium">{r.unit}</Td>
-                    <Td>{r.returnDate}</Td>
+                    <Td>{r.status === 'pending' && !scheduledReturnIds.has(r.id) ? <input value={returnScheduleDrafts[r.id] ?? r.returnDate} onChange={event => setReturnScheduleDrafts(previous => ({ ...previous, [r.id]: event.target.value }))} className="w-32 rounded border border-stone-300 px-2 py-1 text-xs" aria-label={lang === 'vi' ? 'Lịch kiểm tra trả kho' : 'Return inspection schedule'} /> : (returnScheduleDrafts[r.id] ?? r.returnDate)}</Td>
                     <Td>
                       {r.condition === 'good'
                         ? <Badge variant="success">{lang === 'vi' ? 'Tốt' : 'Good'}</Badge>
@@ -276,8 +322,9 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                     <Td className="font-semibold">${r.deposit}</Td>
                     <Td>{s(r.status, { inspected: 'info', pending: 'warning', refunded: 'success' })}</Td>
                     <Td>
-                      {r.status === 'pending' && (
-                        <Button variant="primary" size="sm" onClick={() => { setSelectedReturn(r); setInspectModal(true) }}>
+                      {r.status === 'pending' && !scheduledReturnIds.has(r.id) && <Button variant="primary" size="sm" onClick={() => { setScheduledReturnIds(previous => new Set(previous).add(r.id)); showToast(lang === 'vi' ? 'Đã xác nhận lịch kiểm tra trả kho.' : 'Return inspection schedule confirmed.') }}>{lang === 'vi' ? 'Xác nhận lịch' : 'Confirm schedule'}</Button>}
+                      {r.status === 'pending' && scheduledReturnIds.has(r.id) && (
+                        <Button variant="primary" size="sm" onClick={() => { setSelectedReturn(r); setReturnInventory('match'); setReturnClassification('no-damage'); setReturnEvidence(''); setReturnNotes(r.finalCondition); setReturnConfirmed(false); setInspectModal(true) }}>
                           {t('return.action.inspect', 'Inspect')}
                         </Button>
                       )}
@@ -398,6 +445,9 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                             onClick={() => {
                               setSelectedStaffTicket(tItem)
                               setTicketNewStatus(tItem.status)
+                              setTicketEvidence('')
+                              setTicketEscalated(false)
+                              setTicketEscalationReason('')
                               setRespondModal(true)
                             }}
                           >
@@ -477,36 +527,32 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-sm font-medium">Kết quả kiểm kê</label><select className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option>Đủ số lượng</option><option>Thiếu hàng</option><option>Thừa hàng</option></select></div>
-              <div><label className="text-sm font-medium">Phân loại sau kiểm kê</label><select className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option>Đạt – hoàn cọc</option><option>Hư hỏng nhẹ</option><option>Hư hỏng nặng</option><option>Hàng bỏ lại cần xử lý</option></select></div>
+              <div><label className="text-sm font-medium">{lang === 'vi' ? 'Kết quả kiểm kê' : 'Inventory result'}</label><select value={returnInventory} onChange={event => setReturnInventory(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="match">{lang === 'vi' ? 'Khớp khai báo' : 'Matches declaration'}</option><option value="missing">{lang === 'vi' ? 'Thiếu / đã lấy ra' : 'Missing / removed'}</option><option value="damaged">{lang === 'vi' ? 'Có hàng hư hỏng' : 'Damaged goods'}</option><option value="abandoned">{lang === 'vi' ? 'Có hàng bỏ lại' : 'Abandoned goods'}</option></select></div>
+              <div><label className="text-sm font-medium">{lang === 'vi' ? 'Phân loại hiện trạng' : 'Condition classification'}</label><select value={returnClassification} onChange={event => setReturnClassification(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="no-damage">{lang === 'vi' ? 'Không hư hại' : 'No Damage'}</option><option value="minor-damage">{lang === 'vi' ? 'Hư hại nhẹ' : 'Minor Damage'}</option><option value="major-damage">{lang === 'vi' ? 'Hư hại nặng' : 'Major Damage'}</option><option value="requires-maintenance">{lang === 'vi' ? 'Cần bảo trì' : 'Requires Maintenance'}</option></select></div>
             </div>
-            <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900"><b>Bằng chứng hiện có:</b> {selectedReturn.evidence.join(' · ')}<br/>Khi hoàn tất, hệ thống tạo mã biên bản, ảnh sau kiểm kê và dấu thời gian nhân viên xác nhận.</div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">
-                {lang === 'vi' ? 'Tình Trạng Kho' : 'Unit Condition'}
-              </label>
-              <select className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                <option>{lang === 'vi' ? 'Tốt – Không có hư hại' : 'Good – No damage'}</option>
-                <option>{lang === 'vi' ? 'Hư hỏng nhẹ – Khấu trừ một phần cọc' : 'Minor damage – Partial deduction'}</option>
-                <option>{lang === 'vi' ? 'Hư hỏng nặng – Khấu trừ toàn bộ cọc' : 'Major damage – Full deduction'}</option>
-              </select>
-            </div>
+            <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900"><b>{lang === 'vi' ? 'Bằng chứng bàn giao ban đầu (bất biến)' : 'Immutable initial handover evidence'}:</b> {selectedReturn.evidence.join(' · ')}</div>
+            <Input label={lang === 'vi' ? 'Ảnh/bằng chứng trả kho mới (mã tệp hoặc đường dẫn)' : 'New return evidence (file reference or URL)'} value={returnEvidence} onChange={event => setReturnEvidence(event.target.value)} />
             <div className="space-y-1">
               <label className="text-sm font-medium text-slate-700">
                 {lang === 'vi' ? 'Biên Bản Ghi Chú Hiện Trường' : 'Inspection Notes'}
               </label>
               <textarea
                 rows={3}
+                value={returnNotes}
+                onChange={event => setReturnNotes(event.target.value)}
                 placeholder={lang === 'vi' ? 'Ghi rõ chi tiết hư hại, đồ còn sót lại hoặc vết bẩn...' : 'Document any damage or issues...'}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               />
             </div>
+
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={returnConfirmed} onChange={event => setReturnConfirmed(event.target.checked)} /> {lang === 'vi' ? 'Khách đã xác nhận biên bản trả kho và kết quả đối chiếu' : 'Customer confirmed the return inspection and comparison result'}</label>
             <div className="flex gap-2 justify-end pt-2">
               <Button variant="outline" onClick={() => setInspectModal(false)}>{t('btn.cancel', 'Cancel')}</Button>
               <Button
                 variant="primary"
+                disabled={!returnEvidence.trim() || !returnNotes.trim() || !returnConfirmed}
                 onClick={() => {
-                  setReturns(items => items.map(item => item.id === selectedReturn.id ? { ...item, status: 'inspected', finalCondition: 'Đã kiểm kê và phân loại', classification: 'Đạt – hoàn cọc', evidence: [...item.evidence, `EV-OUT-${Date.now()} · Biên bản trả kho do ${user.name} xác nhận`] } : item))
+                  setReturns(items => items.map(item => item.id === selectedReturn.id ? { ...item, status: 'inspected', finalCondition: returnNotes.trim(), classification: returnClassification, evidence: [...item.evidence, returnEvidence.trim(), `EV-OUT-${Date.now()} · ${user.name} xác nhận kiểm kê ${returnInventory}, phân loại ${returnClassification}`] } : item))
                   setInspectModal(false)
                   showToast(lang === 'vi' ? 'Đã lưu biên bản, hiện trạng sau và bằng chứng kiểm kê!' : 'Inspection, final condition and evidence saved!')
                 }}
@@ -537,40 +583,28 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                 <span><b>Số kiện:</b> {selectedCheckin.packageCount}</span><span><b>Cân thực / DIM:</b> {selectedCheckin.weightKg} / {selectedCheckin.dimWeightKg} kg</span>
               </div>
             </div>
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"><b>Hiện trạng ban đầu cần đối chiếu:</b> {selectedCheckin.initialCondition}</div>
-            <div className="space-y-2">
-              {(lang === 'vi'
-                ? [
-                    'Đã đối chiếu giấy tờ tùy thân (CCCD / Hộ chiếu)',
-                    'Đã xác nhận khách hàng tự chấp thuận điều khoản thuê kho (nhân viên không ký thay)',
-                    'Đã thu tiền cọc và tiền thuê tháng đầu',
-                    'Đã kích hoạt thẻ từ & cấp mã PIN mở cửa',
-                    'Đã cùng khách nghiệm thu thực tế kho'
-                  ]
-                : ['ID verified', 'Customer acceptance confirmed (staff does not sign)', 'Payment confirmed', 'Access code issued', 'Unit walkthrough complete']
-              ).map(step => (
-                <label key={step} className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" className="w-4 h-4 accent-blue-600" />
-                  <span className="text-sm text-slate-700">{step}</span>
-                </label>
-              ))}
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"><b>{lang === 'vi' ? 'Khai báo cần đối chiếu' : 'Declared goods'}:</b> {selectedCheckin.dimensionsCm} cm · {selectedCheckin.weightKg} kg · {selectedCheckin.material} · {selectedCheckin.initialCondition}</div>
+            <div className="rounded-lg border border-stone-200 p-3 space-y-3"><p className="font-semibold text-sm">{lang === 'vi' ? 'Số đo và tình trạng thực tế' : 'Actual goods measurement & condition'}</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><Input label={lang === 'vi' ? 'Kích thước thực tế (D × R × C cm)' : 'Actual dimensions (L × W × H cm)'} value={actualDimensions} onChange={event => setActualDimensions(event.target.value)} /><Input label={lang === 'vi' ? 'Khối lượng thực tế (kg)' : 'Actual weight (kg)'} type="number" value={actualWeight} onChange={event => setActualWeight(event.target.value)} /><Input label={lang === 'vi' ? 'Vật liệu thực tế' : 'Actual material'} value={actualMaterial} onChange={event => setActualMaterial(event.target.value)} /><Input label={lang === 'vi' ? 'Hiện trạng kho ban đầu / hư hại có sẵn' : 'Initial unit condition / existing damage'} value={actualCondition} onChange={event => setActualCondition(event.target.value)} /></div><Input label={lang === 'vi' ? 'Ảnh/bằng chứng bàn giao (mã tệp hoặc đường dẫn)' : 'Handover evidence (file reference or URL)'} value={checkinEvidence} onChange={event => setCheckinEvidence(event.target.value)} /></div>
+            <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+              {([
+                ['identity', lang === 'vi' ? 'Đã đối chiếu CCCD/Hộ chiếu gốc' : 'Original ID/passport verified'],
+                ['reservation', lang === 'vi' ? 'Reservation CONFIRMED, đúng cơ sở, kho và lịch thuê' : 'Confirmed reservation, facility, unit and rental period verified'],
+                ['payment', lang === 'vi' ? 'Điều kiện thanh toán đã đáp ứng' : 'Payment conditions satisfied'],
+                ['measurement', lang === 'vi' ? 'Đã đo hàng thực tế và xử lý chênh lệch' : 'Actual goods measured and variances reviewed'],
+                ['condition', lang === 'vi' ? 'Đã kiểm tra tường, sàn, cửa, khóa, đèn, vệ sinh và hư hại sẵn có' : 'Walls, floor, door, lock, lighting, cleanliness and existing damage checked'],
+                ['credential', lang === 'vi' ? `Đã cấp PIN/thẻ/chìa khóa cho kho ${selectedCheckin.unit}` : `PIN/card/key issued for unit ${selectedCheckin.unit}`],
+                ['customer', lang === 'vi' ? 'Khách đã xác nhận biên bản bàn giao' : 'Customer confirmed handover record']
+              ] as Array<[string, string]>).map(([key, label]) => <label key={key} className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={Boolean(checkinChecks[key])} onChange={event => setCheckinChecks(previous => ({ ...previous, [key]: event.target.checked }))} className="w-4 h-4 accent-blue-600" /><span className="text-sm text-slate-700">{label}</span></label>)}
             </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">
-                {lang === 'vi' ? 'Ghi Chú Nhân Viên' : 'Staff Notes'}
-              </label>
-              <textarea
-                rows={2}
-                placeholder={lang === 'vi' ? 'Ghi chú thêm nếu có...' : 'Optional notes...'}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
-            </div>
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs"><b>{lang === 'vi' ? 'Thông tin credential' : 'Credential record'}:</b> {`PIN-${selectedCheckin.id}`} · {selectedCheckin.unit} · {selectedCheckin.customer} · {user.name} · {lang === 'vi' ? 'kích hoạt khi hoàn tất check-in' : 'activates on check-in completion'}</div>
+            <div className="space-y-1"><label className="text-sm font-medium text-slate-700">{lang === 'vi' ? 'Ghi chú bàn giao' : 'Handover notes'}</label><textarea rows={2} value={checkinNotes} onChange={event => setCheckinNotes(event.target.value)} placeholder={lang === 'vi' ? 'Ghi rõ chênh lệch hàng hóa hoặc lưu ý vận hành...' : 'Record goods variances or operational notes...'} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" /></div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setCheckinModal(false)}>{t('btn.cancel', 'Cancel')}</Button>
               <Button
                 variant="primary"
+                disabled={!Object.values(checkinChecks).every(Boolean) || !actualDimensions.trim() || Number(actualWeight) <= 0 || !actualMaterial.trim() || !actualCondition.trim() || !checkinEvidence.trim()}
                 onClick={() => {
-                  setCheckins(items => items.map(item => item.id === selectedCheckin.id ? { ...item, status: 'completed', evidence: [...item.evidence, `CHECKIN-${Date.now()} · ${user.name} xác nhận đối chiếu và bàn giao`] } : item))
+                  setCheckins(items => items.map(item => item.id === selectedCheckin.id ? { ...item, status: 'completed', dimensionsCm: actualDimensions.trim(), weightKg: Number(actualWeight), material: actualMaterial.trim(), initialCondition: actualCondition.trim(), evidence: [...item.evidence, checkinEvidence.trim(), `CHECKIN-${Date.now()} · ${user.name} xác nhận đối chiếu, cấp credential và bàn giao${checkinNotes.trim() ? ` · ${checkinNotes.trim()}` : ''}`] } : item))
                   setCheckinModal(false)
                   showToast(lang === 'vi' ? 'Đã xác nhận check-in, lưu hiện trạng ban đầu và bằng chứng bàn giao!' : 'Check-in, initial condition and handover evidence saved!')
                 }}
@@ -653,17 +687,21 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
               />
             </div>
 
+            <Input label={lang === 'vi' ? 'Bằng chứng đính kèm (mã tệp/đường dẫn)' : 'Evidence attachment (file reference/URL)'} value={ticketEvidence} onChange={event => setTicketEvidence(event.target.value)} />
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2"><label className="text-xs font-semibold text-amber-900"><input type="checkbox" checked={ticketEscalated} onChange={event => { setTicketEscalated(event.target.checked); if (event.target.checked) setTicketNewStatus('in-progress') }} /> {lang === 'vi' ? 'Chuyển cấp cho quản lý/đội kỹ thuật' : 'Escalate to manager/technical team'}</label>{ticketEscalated && <Input label={lang === 'vi' ? 'Lý do chuyển cấp' : 'Escalation reason'} value={ticketEscalationReason} onChange={event => setTicketEscalationReason(event.target.value)} />}</div>
+
             <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
               <Button variant="outline" onClick={() => setRespondModal(false)}>{t('btn.cancel', 'Cancel')}</Button>
               <Button
                 variant="primary"
+                disabled={!staffReplyText.trim() || (ticketEscalated && !ticketEscalationReason.trim())}
                 onClick={() => {
                   const newMsg = staffReplyText.trim() ? {
                     id: `msg-${Date.now()}`,
                     sender: user.name,
                     role: 'staff' as const,
                     time: lang === 'vi' ? 'Vừa xong' : 'Just now',
-                    text: staffReplyText.trim()
+                    text: `${staffReplyText.trim()}${ticketEvidence.trim() ? `\n[Evidence: ${ticketEvidence.trim()}]` : ''}${ticketEscalated ? `\n[Escalated: ${ticketEscalationReason.trim()}]` : ''}`
                   } : null
 
                   setStaffTickets(prev =>
@@ -671,7 +709,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                       if (ticket.id !== selectedStaffTicket.id) return ticket
                       return {
                         ...ticket,
-                        status: ticketNewStatus,
+                        status: ticketEscalated ? 'in-progress' as const : ticketNewStatus,
                         messages: newMsg ? [...(ticket.messages || []), newMsg] : ticket.messages
                       }
                     })
