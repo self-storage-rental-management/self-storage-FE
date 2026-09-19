@@ -67,7 +67,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard title={lang === 'vi' ? 'Tổng số địa điểm' : 'Total Locations'} value={FACILITIES.length} icon={Icon.building} iconBg="bg-blue-50" />
             <StatCard title={lang === 'vi' ? 'Tổng số gian kho' : 'Total Units'} value={totalUnits} icon={Icon.box} iconBg="bg-purple-50" />
-            <StatCard title={lang === 'vi' ? 'Tỷ lệ lấp đầy TB' : 'Portfolio Occupancy'} value={`${totalUnits ? Math.round(totalOccupied/totalUnits*100) : 0}%`} icon={Icon.chart} iconBg="bg-green-50" />
+            <StatCard title={lang === 'vi' ? 'Tỷ lệ lấp đầy TB' : 'Portfolio Occupancy'} value={`${totalUnits ? Math.round(totalOccupied / totalUnits * 100) : 0}%`} icon={Icon.chart} iconBg="bg-green-50" />
             <StatCard title={lang === 'vi' ? 'Doanh thu tháng (MTD)' : 'Total Revenue MTD'} value={`$${totalRevenue.toLocaleString()}`} icon={Icon.dollar} iconBg="bg-amber-50" />
           </div>
           <div className="space-y-4">
@@ -86,7 +86,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                       <div className="mt-3 grid grid-cols-3 gap-4">
                         <div>
                           <p className="text-xs text-slate-400">{lang === 'vi' ? 'Tỷ lệ lấp đầy' : 'Occupancy'}</p>
-                          <p className="font-semibold text-slate-800">{f.occupied}/{f.units} <span className="text-slate-400 text-xs">({Math.round(f.occupied/f.units*100)}%)</span></p>
+                          <p className="font-semibold text-slate-800">{f.occupied}/{f.units} <span className="text-slate-400 text-xs">({Math.round(f.occupied / f.units * 100)}%)</span></p>
                           <ProgressBar value={f.occupied} max={f.units} color="bg-blue-500" />
                         </div>
                         <div>
@@ -138,18 +138,20 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                     <Td className="font-medium text-slate-800">
                       {lang === 'vi' ? (
                         p.name === 'Grace Period' ? 'Thời gian gia hạn nợ' :
-                        p.name === 'Late Fee' ? 'Mức phí phạt trễ hạn' :
-                        p.name === 'Security Deposit' ? 'Tiền đặt cọc an ninh' :
-                        p.name === 'Notice to Vacate' ? 'Thời hạn báo trước khi trả phòng' :
-                        p.name === 'Minimum Lease' ? 'Thời hạn thuê tối thiểu' : p.name
+                          p.name === 'Late Fee' ? 'Mức phí phạt trễ hạn' :
+                            p.name === 'Security Deposit' ? 'Tiền đặt cọc an ninh' :
+                              p.name === 'Notice to Vacate' ? 'Thời hạn báo trước khi trả phòng' :
+                                p.name === 'Minimum Lease' ? 'Thời hạn thuê tối thiểu' : p.name
                       ) : p.name}
                     </Td>
+
                     <Td>
                       {lang === 'vi' ? (
                         p.value.includes('days') ? p.value.replace('days', 'ngày') :
-                        p.value.includes('month') ? p.value.replace('month', 'tháng') : p.value
-                      ) : p.value}
+                          p.value.includes('month') ? p.value.replace('month', 'tháng') : (p.value ?? '—')
+                      ) : (p.value ?? '—')}
                     </Td>
+
                     <Td><Badge variant="muted">{lang === 'vi' ? (p.scope === 'All Facilities' ? 'Toàn bộ cơ sở' : p.scope) : p.scope}</Badge></Td>
                     <Td className="text-right">
                       {p.editable && (
@@ -175,11 +177,14 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             {PRICING_TIERS.map(tier => (
-              <Card key={tier.type} className="p-5">
+              // <Card key={tier.type} className="p-5"> 
+              <Card key={tier.id} className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="font-bold text-slate-900">{tier.type}</h3>
-                    <p className="text-xs text-slate-400">{tier.sizes} ft</p>
+                    {/* <h3 className="font-bold text-slate-900">{tier.type}</h3> */}
+                    <h3 className="font-bold text-slate-900">{tier.name}</h3>
+                    {/* <p className="text-xs text-slate-400">{tier.sizes} ft</p> */}
+                    <p className="text-xs text-slate-400">{tier.size}</p>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => { setSelectedTier(tier); setPricingModal(true) }}>
                     {lang === 'vi' ? 'Sửa' : 'Edit'}
@@ -220,18 +225,18 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                     <Td className="font-medium">
                       {lang === 'vi' ? (
                         f.type.includes('Late') ? 'Phí nộp muộn' :
-                        f.type.includes('Admin') ? 'Phí hồ sơ ban đầu' :
-                        f.type.includes('Lock') ? 'Phí cắt khóa số' :
-                        f.type.includes('Cleaning') ? 'Phí dọn vệ sinh kho' : f.type
+                          f.type.includes('Admin') ? 'Phí hồ sơ ban đầu' :
+                            f.type.includes('Lock') ? 'Phí cắt khóa số' :
+                              f.type.includes('Cleaning') ? 'Phí dọn vệ sinh kho' : f.type
                       ) : f.type}
                     </Td>
                     <Td className="font-semibold text-blue-700">{f.amount}</Td>
                     <Td className="text-slate-500">
                       {lang === 'vi' ? (
                         f.trigger.includes('past due') ? 'Quá hạn thanh toán 7 ngày' :
-                        f.trigger.includes('Move-in') ? 'Khi ký hợp đồng nhận kho' :
-                        f.trigger.includes('Lost key') ? 'Quên mã PIN hoặc kẹt khóa' :
-                        f.trigger.includes('Move-out') ? 'Trả kho còn rác bẩn' : f.trigger
+                          f.trigger.includes('Move-in') ? 'Khi ký hợp đồng nhận kho' :
+                            f.trigger.includes('Lost key') ? 'Quên mã PIN hoặc kẹt khóa' :
+                              f.trigger.includes('Move-out') ? 'Trả kho còn rác bẩn' : f.trigger
                       ) : f.trigger}
                     </Td>
                     <Td><Badge variant="muted">{lang === 'vi' ? (f.applies === 'All Facilities' ? 'Toàn bộ cơ sở' : f.applies) : f.applies}</Badge></Td>
@@ -343,9 +348,9 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                 tabs={lang === 'vi' ? ['Tất cả', 'Đang chạy', 'Tạm dừng', 'Hết hạn'] : ['All', 'active', 'paused', 'expired']}
                 active={
                   promoTab === 'All' && lang === 'vi' ? 'Tất cả' :
-                  promoTab === 'active' && lang === 'vi' ? 'Đang chạy' :
-                  promoTab === 'paused' && lang === 'vi' ? 'Tạm dừng' :
-                  promoTab === 'expired' && lang === 'vi' ? 'Hết hạn' : promoTab
+                    promoTab === 'active' && lang === 'vi' ? 'Đang chạy' :
+                      promoTab === 'paused' && lang === 'vi' ? 'Tạm dừng' :
+                        promoTab === 'expired' && lang === 'vi' ? 'Hết hạn' : promoTab
                 }
                 onChange={val => {
                   if (val === 'Tất cả') setPromoTab('All')
@@ -387,8 +392,8 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-50 text-amber-900 border border-amber-200">
                             {lang === 'vi' ? (
                               p.type === 'percentage' ? 'Giảm theo %' :
-                              p.type === 'first-month-free' ? 'Tháng đầu 0đ' :
-                              p.type === 'fixed-amount' ? 'Giảm số tiền' : 'Ưu đãi mùa vụ'
+                                p.type === 'first-month-free' ? 'Tháng đầu 0đ' :
+                                  p.type === 'fixed-amount' ? 'Giảm số tiền' : 'Ưu đãi mùa vụ'
                             ) : p.typeLabel}
                           </span>
                         </div>
@@ -486,7 +491,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
               <AreaChart data={REVENUE_TREND} margin={{ top: 0, right: 0, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+                <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip formatter={((v: number) => [`$${v.toLocaleString()}`, lang === 'vi' ? 'Doanh thu' : 'Revenue']) as any} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
                 <Area type="monotone" dataKey="revenue" stroke="#3b82f6" fill="#dbeafe" name={lang === 'vi' ? 'Doanh thu' : 'Revenue'} />
               </AreaChart>
@@ -504,7 +509,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
               <Tbody>
                 {REVENUE_TREND.map((r, i) => {
                   const total = r.revenue
-                  const prev = i > 0 ? REVENUE_TREND[i-1].revenue : total
+                  const prev = i > 0 ? REVENUE_TREND[i - 1].revenue : total
                   const growth = i === 0 ? 0 : ((total - prev) / prev * 100)
                   return (
                     <Tr key={r.month}>
@@ -554,9 +559,9 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                 <div key={f.id} className="mb-4">
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-slate-700 font-medium">{f.name}</span>
-                    <span className="text-slate-800 font-semibold">{Math.round(f.occupied/f.units*100)}%</span>
+                    <span className="text-slate-800 font-semibold">{Math.round(f.occupied / f.units * 100)}%</span>
                   </div>
-                  <ProgressBar value={f.occupied} max={f.units} color={f.occupied/f.units >= 0.85 ? 'bg-green-500' : 'bg-blue-500'} />
+                  <ProgressBar value={f.occupied} max={f.units} color={f.occupied / f.units >= 0.85 ? 'bg-green-500' : 'bg-blue-500'} />
                 </div>
               ))}
             </Card>
@@ -579,7 +584,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                     <Td className="font-medium">{f.name}</Td>
                     <Td>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold">{Math.round(f.occupied/f.units*100)}%</span>
+                        <span className="font-semibold">{Math.round(f.occupied / f.units * 100)}%</span>
                         <ProgressBar value={f.occupied} max={f.units} color="bg-blue-500" />
                       </div>
                     </Td>
@@ -616,7 +621,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
       <Modal open={pricingModal} onClose={() => setPricingModal(false)} title={lang === 'vi' ? 'Chỉnh Sửa Phân Tầng Giá' : 'Edit Pricing Tier'}>
         {selectedTier && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-500">{lang === 'vi' ? 'Đang chỉnh sửa:' : 'Editing:'} <strong>{selectedTier.type}</strong> ({selectedTier.sizes} ft)</p>
+            <p className="text-sm text-slate-500">{lang === 'vi' ? 'Đang chỉnh sửa:' : 'Editing:'} <strong>{selectedTier.name}</strong> ({selectedTier.size} ft)</p>
             <Input label={lang === 'vi' ? 'Giá cơ sở ($/tháng)' : 'Base Price ($/mo)'} type="number" defaultValue={selectedTier.basePrice.toString()} />
             <Input label={lang === 'vi' ? 'Phụ phí điều hòa ($/tháng)' : 'Climate Control Adder ($/mo)'} type="number" defaultValue={selectedTier.climateAdder.toString()} />
             <Input label={lang === 'vi' ? 'Hệ số cao điểm' : 'High Demand Multiplier'} type="number" defaultValue={selectedTier.highDemandMultiplier.toString()} />
