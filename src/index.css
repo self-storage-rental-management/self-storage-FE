@@ -4,6 +4,11 @@
 /* The icon-free presentation keeps charts (Recharts SVG surfaces) visible. */
 svg:not(.recharts-surface) { display: none !important; }
 
+/* The customer notification control keeps its functional bell icon. */
+.customer-notification-bell svg {
+  display: block !important;
+}
+
 :root {
   --ink: #24241f;
   --ink-soft: #5f5e55;
@@ -40,6 +45,12 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+/* Customer portal typography stays consistent without recoloring content panels. */
+.customer-page,
+.customer-page * {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif !important;
 }
 
 button:not(:disabled) { cursor: pointer; }

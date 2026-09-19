@@ -106,6 +106,22 @@ export function checkDateOverlap(startA: string, endA: string, startB: string, e
   return sA < eB && eA > sB
 }
 
+function toValidDate(value: string): Date {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) throw new Error(`Ngày không hợp lệ: ${value}`)
+  return parsed
+}
+
+function toDateInputValue(value: Date): string {
+  return value.toISOString().split('T')[0]
+}
+
+function addCalendarMonths(value: string, months: number): string {
+  const date = toValidDate(value)
+  date.setMonth(date.getMonth() + months)
+  return toDateInputValue(date)
+}
+
 // Map demo facilities
 const INITIAL_FACILITIES: Facility[] = FACILITIES.map(f => ({
   id: f.id,
@@ -612,6 +628,8 @@ interface StorageHubContextValue extends StorageHubState {
     moveInDate: string
     identityId: string
     customerPhone: string
+    customerAddress?: string
+    appointmentTime: string
     largestItemDimensionsCm?: { lengthCm: number; widthCm: number; heightCm: number }
   }) => ReservationValidationResult
   assignUnitToHold: (reservationId: string, unitId: string, managerUser: User) => void
@@ -650,7 +668,8 @@ interface StorageHubContextValue extends StorageHubState {
     goodsHandover: NonNullable<CheckInRecord['goodsHandover']>
     handedOverItems: string[]
   }) => RentalRecord
-  requestRenewal: (rentalId: string, requestedEndDate: string, customer: User) => RenewalRecord
+  confirmUnitReceipt: (rentalId: string, customer: User) => void
+  requestRenewal: (rentalId: string, renewalMonths: number, customer: User) => RenewalRecord
   approveRenewal: (renewalId: string, managerUser: User) => void
   rejectRenewal: (renewalId: string, managerUser: User, reason?: string) => void
   payRenewal: (renewalId: string, paymentMethod: string, transactionId?: string) => void
@@ -670,6 +689,8 @@ interface StorageHubContextValue extends StorageHubState {
     returnedItems: { key: boolean; card: boolean; lock: boolean }
     customerConfirmed: boolean
   }) => void
+  confirmReturnSettlement: (returnId: string, customer: User, decision: 'accepted' | 'disputed', note?: string) => void
+  reviewReturnDispute: (returnId: string, manager: User, resolutionNote?: string) => void
   createMaintenanceTask: (unitId: string, reason: string, staffUser?: User) => MaintenanceTask
   completeMaintenanceTask: (taskId: string, managerUser: User) => void
   releaseMaintenanceUnit: (unitId: string, staffUser: User) => void
@@ -689,10 +710,11 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
         const parsed = JSON.parse(saved)
         return {
           ...parsed,
-          holds: parsed.holds || INITIAL_RESERVATIONS,
+          units: Array.isArray(parsed.units) && parsed.units.length >= INITIAL_UNITS.length ? parsed.units : INITIAL_UNITS,
+          holds: Array.isArray(parsed.holds) ? parsed.holds.map((hold: StorageReservation) => ({ ...hold, appointmentDate: hold.appointmentDate || hold.moveInDate, appointmentTime: hold.appointmentTime || '09:00 AM' })) : INITIAL_RESERVATIONS,
           contracts: parsed.contracts || INITIAL_CONTRACTS,
           payments: parsed.payments || [],
-          renewals: parsed.renewals || [],
+          renewals: Array.isArray(parsed.renewals) ? parsed.renewals.map((renewal: RenewalRecord) => ({ ...renewal, renewalMonths: renewal.renewalMonths || 1 })) : [],
           maintenanceTasks: parsed.maintenanceTasks || [],
           accessCredentials: parsed.accessCredentials || [],
           checkins: Array.isArray(parsed.checkins) ? parsed.checkins.map(normalizeCheckin) : INITIAL_CHECKINS,
@@ -758,6 +780,8 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
     moveInDate: string
     identityId: string
     customerPhone: string
+    customerAddress?: string
+    appointmentTime: string
     largestItemDimensionsCm?: { lengthCm: number; widthCm: number; heightCm: number }
   }): ReservationValidationResult => {
     const unitType = UNIT_TYPES.find(ut => ut.id === params.unitTypeId) || UNIT_TYPES[1]
@@ -776,7 +800,7 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
       u => u.facilityId === params.facilityId && u.type.toLowerCase().includes(unitType.name.split(' ')[0].toLowerCase()) && u.status !== 'maintenance'
     )
 
-    const availableUnit = candidateUnits.find(u => {
+    const dateAvailableUnits = candidateUnits.filter(u => {
       // Check if any reservation or rental overlaps on this unit
       const overlapsReservation = state.holds.some(
         h => h.assignedUnitId === u.id && ['DEPOSIT_PAID', 'UNIT_RESERVED', 'READY_FOR_CHECKIN'].includes(h.status) &&
@@ -788,6 +812,14 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
       )
       return !overlapsReservation && !overlapsRental
     })
+    const unassignedCapacityHolds = state.holds.filter(hold =>
+      !hold.assignedUnitId &&
+      hold.facilityId === params.facilityId &&
+      hold.unitTypeId === unitType.id &&
+      (hold.status === 'DEPOSIT_PAID' || (hold.status === 'CREATED' && Boolean(hold.paymentExpiresAt) && new Date(hold.paymentExpiresAt!).getTime() > nowTime)) &&
+      checkDateOverlap(startDate, endDate, hold.startDate, hold.endDate)
+    )
+    const availableUnit = dateAvailableUnits[unassignedCapacityHolds.length]
 
     if (!availableUnit) {
       return {
@@ -821,11 +853,21 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
     const sortedItem = [itemL / 100, itemW / 100, itemH / 100].sort((a, b) => b - a)
     const sortedUnit = [unitType.lengthM, unitType.widthM, unitType.heightM].sort((a, b) => b - a)
 
+    const packageDimensionsM = [itemL / 100, itemW / 100, itemH / 100]
+    const doorWidth = availableUnit.doorDimensions.widthM
+    const doorHeight = availableUnit.doorDimensions.heightM
+    const doorPairs = [[0, 1], [0, 2], [1, 2]]
+    const fitsThroughDoor = doorPairs.some(([a, b]) => {
+      const first = packageDimensionsM[a]
+      const second = packageDimensionsM[b]
+      return (first <= doorWidth && second <= doorHeight) || (second <= doorWidth && first <= doorHeight)
+    })
+
     const boxDoesNotFit = sortedItem[0] > sortedUnit[0] || sortedItem[1] > sortedUnit[1] || sortedItem[2] > sortedUnit[2]
     const weightExceeds = params.goods.weightKg > unitType.maxLoadKg
     const volumeExceeds = totalGoodsVolM3 > unitType.volumeM3
 
-    if (boxDoesNotFit || weightExceeds || volumeExceeds) {
+    if (!fitsThroughDoor || boxDoesNotFit || weightExceeds || volumeExceeds) {
       const suggested = UNIT_TYPES.find(ut => {
         const su = [ut.lengthM, ut.widthM, ut.heightM].sort((a, b) => b - a)
         return (
@@ -838,7 +880,8 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
       })
 
       let reason = ''
-      if (volumeExceeds) reason = `Tổng thể tích hàng (${totalGoodsVolM3} m³) vượt quá dung tích gian kho (${unitType.volumeM3} m³).`
+      if (!fitsThroughDoor) reason = `Kiện hàng lớn nhất (${itemL}×${itemW}×${itemH} cm) không lọt qua cửa kho ${Math.round(doorWidth * 100)}×${Math.round(doorHeight * 100)} cm, kể cả khi xoay kiện.`
+      else if (volumeExceeds) reason = `Tổng thể tích hàng (${totalGoodsVolM3} m³) vượt quá dung tích gian kho (${unitType.volumeM3} m³).`
       else if (boxDoesNotFit) reason = `Kiện hàng lớn nhất (${itemL}×${itemW}×${itemH} cm) vượt quá kích thước kho sau khi xoay các chiều.`
       else if (weightExceeds) reason = `Tổng cân nặng (${params.goods.weightKg} kg) vượt quá tải trọng sàn (${unitType.maxLoadKg} kg).`
 
@@ -853,21 +896,16 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Financial formulas:
-    // FirstMonthRent = monthlyPrice
-    // SecurityDeposit = monthlyPrice (recorded in contract, refundable)
-    // TotalInitial = FirstMonthRent + SecurityDeposit
-    // ReservationDeposit (20%) = 20% of TotalInitial
-    // RemainingBalance = TotalInitial - ReservationDeposit
+    // Customer formula A: full rental term, 20% booking deposit, remainder at check-in.
     const firstMonthRent = unitType.monthlyPrice
-    const securityDepositAmount = unitType.monthlyPrice
-    const totalInitialAmount = firstMonthRent + securityDepositAmount
-    const reservationDepositAmount = Math.round(totalInitialAmount * 0.2)
+    const securityDepositAmount = 0
+    const totalInitialAmount = unitType.monthlyPrice * params.rentalMonths
+    const reservationDepositAmount = Math.round(totalInitialAmount * 0.2 * 100) / 100
     const remainingAmount = totalInitialAmount - reservationDepositAmount
 
     const holdId = `RSV-${Date.now().toString().slice(-4)}`
     const quoteId = `QUO-${Date.now().toString().slice(-4)}`
-    const paymentExpiresAt = new Date(nowTime + 24 * 60 * 60 * 1000).toISOString()
+    const paymentExpiresAt = new Date(nowTime + 12 * 60 * 60 * 1000).toISOString()
 
     const pricingQuote: PricingQuote = {
       quoteId,
@@ -891,6 +929,7 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
       customerName: params.customer.name,
       customerEmail: params.customer.email,
       customerPhone: params.customerPhone,
+      customerAddress: params.customerAddress,
       identityId: params.identityId,
       facilityId: params.facilityId,
       facilityName: availableUnit.facilityName,
@@ -902,7 +941,7 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
       startDate,
       endDate,
       moveInDate: params.moveInDate,
-      status: 'DEPOSIT_PAID', // Customer pays 20% reservation deposit
+      status: 'CREATED',
       reservationDepositAmount,
       securityDepositAmount,
       remainingAmount,
@@ -915,15 +954,12 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
       quote: pricingQuote,
       payment: {
         amount: reservationDepositAmount,
-        status: 'paid',
-        method: 'Thanh toán cọc giữ chỗ 20% (Online)',
-        transactionId: `TX-DEP-${Date.now().toString().slice(-6)}`,
-        paidAt: now.toISOString()
+        status: 'pending'
       },
       appointmentDate: params.moveInDate,
-      appointmentTime: '09:00 AM',
+      appointmentTime: params.appointmentTime,
       expiresAt: paymentExpiresAt,
-      evidence: [`${holdId} · Đã thanh toán cọc giữ chỗ 20% ($${reservationDepositAmount}). Chờ Facility Manager phân kho.`],
+      evidence: [`${holdId} · Đã xác nhận thông tin. Chờ thanh toán cọc 20% trước ${paymentExpiresAt}.`],
       createdAt: now.toISOString()
     }
 
@@ -940,7 +976,7 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
           facilityId: params.facilityId,
           entityType: 'hold',
           entityId: holdId,
-          notes: `Khách hàng đặt cỡ kho ${unitType.name}, cọc giữ chỗ 20% ($${reservationDepositAmount}). Chưa gán mã kho cụ thể.`,
+          notes: `Khách hàng xác nhận đặt cỡ kho ${unitType.name}. Chờ cọc 20% ($${reservationDepositAmount}) trong 12 giờ.`,
           timestamp: now.toLocaleString('vi-VN')
         },
         ...prev.activities
@@ -950,8 +986,8 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
     return {
       outcome: 'PASS',
       hold: newReservation,
-      messageVi: `Đặt chỗ thành công! Đã ghi nhận cọc giữ chỗ 20% ($${reservationDepositAmount}). Facility Manager sẽ phân kho trước ngày hẹn.`,
-      messageEn: `Reservation confirmed! 20% deposit ($${reservationDepositAmount}) received. Facility Manager will assign a unit.`
+      messageVi: `Đã xác nhận đặt kho. Vui lòng thanh toán cọc 20% ($${reservationDepositAmount}) trong 12 giờ.`,
+      messageEn: `Booking confirmed. Please pay the 20% deposit ($${reservationDepositAmount}) within 12 hours.`
     }
   }
 
@@ -1038,6 +1074,9 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
           }
           return h
         }),
+        checkins: reservation.appointmentDate && reservation.appointmentTime && !prev.checkins.some(c => c.holdId === reservation.id)
+          ? [{ id: `CHK-${Date.now().toString().slice(-6)}`, holdId: reservation.id, unitId, facilityId: reservation.facilityId, customerId: reservation.customerId, customerName: reservation.customerName, staffId: '', staffName: 'Chưa phân công', scheduledDate: reservation.appointmentDate, scheduledTime: reservation.appointmentTime, status: 'scheduled', checklist: { identityVerified: false, termsAccepted: false, paymentConfirmed: reservation.payment.status === 'paid', unitWalkthrough: false, accessCodeIssued: false }, actualMeasurements: { lengthCm: reservation.goods.lengthCm, widthCm: reservation.goods.widthCm, heightCm: reservation.goods.heightCm, weightKg: reservation.goods.weightKg, actualVolumeM3: (reservation.goods.lengthCm * reservation.goods.widthCm * reservation.goods.heightCm * reservation.goods.packageCount) / 1000000, varianceAccepted: false }, initialCondition: '', evidencePhotos: [] }, ...prev.checkins]
+          : prev.checkins,
         accessCredentials: newCred ? [...prev.accessCredentials, newCred] : prev.accessCredentials,
         activities: [
           {
@@ -1092,6 +1131,8 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
           }
           return h
         }),
+        checkins: prev.checkins.map(checkin => checkin.holdId === reservationId ? { ...checkin, status: 'cancelled' as const } : checkin),
+        accessCredentials: prev.accessCredentials.map(credential => credential.reservationId === reservationId ? { ...credential, status: 'REVOKED' as const, revokedAt: now.toISOString() } : credential),
         activities: [
           {
             id: `act-${Date.now()}`,
@@ -1443,10 +1484,36 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
     return newRental
   }
 
+  const confirmUnitReceipt = (rentalId: string, customer: User) => {
+    const rental = state.rentals.find(r => r.id === rentalId)
+    if (!rental || rental.customerId !== customer.id) throw new Error('Không tìm thấy hồ sơ thuê thuộc tài khoản này.')
+    if (rental.receiptConfirmedAt) return
+    const now = new Date()
+    setState(prev => ({
+      ...prev,
+      rentals: prev.rentals.map(r => r.id === rentalId ? { ...r, receiptConfirmedAt: now.toISOString(), receiptConfirmedBy: customer.id } : r),
+      checkins: prev.checkins.map(c => c.holdId === rental.holdId ? { ...c, customerConfirmationTimestamp: now.toISOString() } : c),
+      activities: [{
+        id: `act-${Date.now()}`,
+        action: 'UNIT_RECEIPT_CONFIRMED',
+        actorId: customer.id,
+        actorName: customer.name,
+        actorRole: customer.role,
+        facilityId: rental.facilityId,
+        entityType: 'rental',
+        entityId: rental.id,
+        notes: `Khách hàng xác nhận đã nhận gian kho ${rental.unitId} và thông tin truy cập.`,
+        timestamp: now.toLocaleString('vi-VN')
+      }, ...prev.activities]
+    }))
+  }
+
   // 7. Renewals: Customer requests, Manager approves, Customer pays
-  const requestRenewal = (rentalId: string, requestedEndDate: string, customer: User): RenewalRecord => {
+  const requestRenewal = (rentalId: string, renewalMonths: number, customer: User): RenewalRecord => {
     const rental = state.rentals.find(r => r.id === rentalId)
     if (!rental || rental.status !== 'active') throw new Error('Chỉ hợp đồng đang hoạt động mới được yêu cầu gia hạn.')
+    if (![1, 3, 6, 12].includes(renewalMonths)) throw new Error('Gói gia hạn không hợp lệ.')
+    const requestedEndDate = addCalendarMonths(rental.endDate, renewalMonths)
 
     const renewalRecord: RenewalRecord = {
       id: `RNW-${Date.now().toString().slice(-6)}`,
@@ -1457,7 +1524,8 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
       customerName: customer.name,
       oldEndDate: rental.endDate,
       newEndDate: requestedEndDate,
-      renewalFee: rental.monthlyRate,
+      renewalMonths,
+      renewalFee: rental.monthlyRate * renewalMonths,
       status: 'pending',
       requestedAt: new Date().toISOString()
     }
@@ -1475,7 +1543,7 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
           facilityId: rental.facilityId,
           entityType: 'rental',
           entityId: rental.id,
-          notes: `Khách gửi yêu cầu gia hạn kho ${rental.unitId} đến ngày ${requestedEndDate}.`,
+          notes: `Khách gửi yêu cầu gia hạn kho ${rental.unitId} thêm ${renewalMonths} tháng, đến ngày ${requestedEndDate}.`,
           timestamp: new Date().toLocaleString('vi-VN')
         },
         ...prev.activities
@@ -1580,6 +1648,15 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
   const requestReturn = (rentalId: string, scheduledDate: string, customer: User, reason?: string): ReturnCase => {
     const rental = state.rentals.find(r => r.id === rentalId)
     if (!rental || rental.status !== 'active') throw new Error('Chỉ hợp đồng đang hoạt động mới được gửi yêu cầu trả kho.')
+    const requestedReturnDate = toValidDate(scheduledDate)
+    requestedReturnDate.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const contractEnd = toValidDate(rental.endDate)
+    contractEnd.setHours(23, 59, 59, 999)
+    if (requestedReturnDate < today || requestedReturnDate > contractEnd) {
+      throw new Error(`Ngày trả kho phải từ hôm nay đến hết hạn hợp đồng (${rental.endDate}).`)
+    }
 
     const returnId = `RET-${Date.now().toString().slice(-6)}`
     const now = new Date()
@@ -1647,27 +1724,13 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
     const needsPhysicalRepair = params.damageClassification !== 'no_damage' || params.cleaningFee > 0 || params.inventoryMatch === 'excess'
     const nextUnitStatus: 'available' | 'maintenance' = needsPhysicalRepair ? 'maintenance' : 'available'
 
-    let newMaintTask: MaintenanceTask | undefined
-    if (needsPhysicalRepair) {
-      newMaintTask = {
-        id: `MNT-${Date.now().toString().slice(-6)}`,
-        unitId: unit.id,
-        facilityId: unit.facilityId,
-        reason: `${params.damageClassification !== 'no_damage' ? `Hư hại (${params.damageClassification}). ` : ''}${params.cleaningFee > 0 ? 'Cần dọn vệ sinh. ' : ''}${params.staffNotes}`,
-        damageClassification: params.damageClassification,
-        status: 'pending',
-        createdAt: now.toISOString()
-      }
-    }
-
     setState(prev => ({
       ...prev,
-      units: prev.units.map(u => (u.id === unit.id ? { ...u, status: nextUnitStatus, currentRentalId: undefined } : u)),
-      rentals: prev.rentals.map(r => (r.id === rental.id ? { ...r, status: 'completed', gateCode: '', checkedOutAt: now.toISOString() } : r)),
+      units: prev.units.map(u => (u.id === unit.id ? { ...u, status: 'maintenance' } : u)),
+      rentals: prev.rentals.map(r => (r.id === rental.id ? { ...r, status: 'closing' } : r)),
       returns: prev.returns.map(r => r.id === returnCase.id ? {
         ...r,
-        status: 'completed',
-        completedAt: now.toISOString(),
+        status: 'awaiting_customer_confirmation',
         damageClassification: params.damageClassification,
         damageFee: params.damageFee,
         cleaningFee: params.cleaningFee,
@@ -1676,23 +1739,23 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
         outstandingFee: params.outstandingFee,
         netRefundAmount: netRefund,
         staffNotes: params.staffNotes,
-        customerConfirmed: params.customerConfirmed,
+        evidence: [...r.evidence, ...params.evidencePhotos],
+        customerConfirmed: false,
         returnedItems: params.returnedItems,
-        staffId: params.staffUser.id
+        staffId: params.staffUser.id,
+        proposedUnitStatus: nextUnitStatus
       } : r),
-      accessCredentials: prev.accessCredentials.map(ac => ac.rentalId === rental.id ? { ...ac, status: 'REVOKED', revokedAt: now.toISOString() } : ac),
-      maintenanceTasks: newMaintTask ? [newMaintTask, ...prev.maintenanceTasks] : prev.maintenanceTasks,
       activities: [
         {
           id: `act-${Date.now()}`,
-          action: 'CHECKOUT_COMPLETED',
+          action: 'RETURN_INSPECTION_COMPLETED',
           actorId: params.staffUser.id,
           actorName: params.staffUser.name,
           actorRole: params.staffUser.role,
           facilityId: unit.facilityId,
           entityType: 'return',
           entityId: returnCase.id,
-          notes: `Checkout kho ${unit.code}. Quyết toán cọc: Hoàn lại $${netRefund}. Tình trạng kho: ${nextUnitStatus.toUpperCase()}.`,
+          notes: `Đã nghiệm thu kho ${unit.code}. Đề xuất hoàn $${netRefund}; chờ khách hàng xác nhận quyết toán.`,
           timestamp: now.toLocaleString('vi-VN')
         },
         ...prev.activities
@@ -1775,7 +1838,7 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
           ? {
               id: `msg-${Date.now()}`,
               sender: staffUser.name,
-              role: 'staff' as const,
+              role: (staffUser.role === 'customer' ? 'customer' : 'staff') as 'customer' | 'staff',
               time: `Hôm nay · ${now}`,
               text: replyText.trim()
             }
@@ -1869,6 +1932,13 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
   }
 
   const payStorageHold = (holdId: string, paymentMethod: string = 'Chuyển khoản VietQR') => {
+    const paidAt = new Date()
+    const checkInDeadline = new Date(paidAt.getTime() + 14 * 24 * 60 * 60 * 1000)
+    const targetHold = state.holds.find(hold => hold.id === holdId)
+    if (!targetHold) throw new Error('Không tìm thấy đơn đặt giữ kho.')
+    if (!targetHold.appointmentDate || !targetHold.appointmentTime) throw new Error('Đơn chưa có lịch Check-in hợp lệ.')
+    const scheduledDate = toValidDate(targetHold.appointmentDate)
+    if (scheduledDate.getTime() > checkInDeadline.getTime()) throw new Error('Lịch Check-in phải nằm trong 14 ngày sau khi thanh toán cọc. Vui lòng đổi lịch trước khi thanh toán.')
     setState(prev => ({
       ...prev,
       holds: prev.holds.map(h => {
@@ -1877,17 +1947,101 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
           return {
             ...h,
             status: isAssigned ? 'UNIT_RESERVED' : 'DEPOSIT_PAID',
+            depositPaidAt: paidAt.toISOString(),
+            checkInDeadline: checkInDeadline.toISOString(),
             payment: {
               amount: h.reservationDepositAmount,
               status: 'paid',
               method: paymentMethod,
-              paidAt: new Date().toISOString(),
+              paidAt: paidAt.toISOString(),
               transactionId: `TX-DEP-${Date.now().toString().slice(-6)}`
             }
           }
         }
         return h
-      })
+      }),
+      payments: (() => {
+        const hold = prev.holds.find(h => h.id === holdId)
+        if (!hold || hold.payment.status === 'paid') return prev.payments
+        const transactionId = `TX-DEP-${Date.now().toString().slice(-6)}`
+        return [{
+          id: transactionId,
+          reservationId: hold.id,
+          type: 'RESERVATION_DEPOSIT' as const,
+          amount: hold.reservationDepositAmount,
+          paymentMethod: 'ONLINE_GATEWAY' as const,
+          transactionReference: transactionId,
+          status: 'PAID' as const,
+          paidAt: paidAt.toISOString(),
+          recordedBy: hold.customerId
+        }, ...prev.payments]
+      })()
+    }))
+  }
+
+  const confirmReturnSettlement = (returnId: string, customer: User, decision: 'accepted' | 'disputed', note?: string) => {
+    const returnCase = state.returns.find(r => r.id === returnId)
+    if (!returnCase || returnCase.customerId !== customer.id) throw new Error('Không tìm thấy hồ sơ trả kho thuộc tài khoản này.')
+    if (returnCase.status !== 'awaiting_customer_confirmation') throw new Error('Hồ sơ chưa sẵn sàng để xác nhận quyết toán.')
+    const rental = state.rentals.find(r => r.id === returnCase.rentalId)
+    const unit = state.units.find(u => u.id === returnCase.unitId)
+    if (!rental || !unit) throw new Error('Không tìm thấy hợp đồng hoặc gian kho.')
+    const now = new Date()
+
+    if (decision === 'disputed') {
+      setState(prev => ({
+        ...prev,
+        returns: prev.returns.map(r => r.id === returnId ? { ...r, status: 'disputed', customerDecision: 'disputed', customerDecisionNote: note?.trim() || 'Khách hàng yêu cầu xem xét lại quyết toán.' } : r),
+        activities: [{ id: `act-${Date.now()}`, action: 'RETURN_SETTLEMENT_DISPUTED', actorId: customer.id, actorName: customer.name, actorRole: customer.role, facilityId: returnCase.facilityId, entityType: 'return', entityId: returnId, notes: note?.trim() || 'Khách hàng yêu cầu xem xét lại quyết toán.', timestamp: now.toLocaleString('vi-VN') }, ...prev.activities]
+      }))
+      return
+    }
+
+    const refundId = `RF-${Date.now().toString().slice(-8)}`
+    const refundPayment: StoragePayment = {
+      id: refundId,
+      reservationId: rental.holdId,
+      rentalId: rental.id,
+      type: 'REFUND',
+      amount: returnCase.netRefundAmount,
+      paymentMethod: 'BANK_TRANSFER',
+      transactionReference: refundId,
+      status: 'PAID',
+      paidAt: now.toISOString(),
+      recordedBy: 'SYSTEM'
+    }
+    const needsMaintenance = returnCase.proposedUnitStatus === 'maintenance'
+    const maintenanceTask: MaintenanceTask | undefined = needsMaintenance ? {
+      id: `MNT-${Date.now().toString().slice(-6)}`,
+      unitId: unit.id,
+      facilityId: unit.facilityId,
+      reason: returnCase.staffNotes || 'Xử lý hiện trạng sau trả kho',
+      damageClassification: returnCase.damageClassification,
+      status: 'pending',
+      createdAt: now.toISOString()
+    } : undefined
+
+    setState(prev => ({
+      ...prev,
+      payments: returnCase.netRefundAmount > 0 ? [refundPayment, ...prev.payments] : prev.payments,
+      units: prev.units.map(u => u.id === unit.id ? { ...u, status: needsMaintenance ? 'maintenance' : 'available', currentRentalId: undefined } : u),
+      rentals: prev.rentals.map(r => r.id === rental.id ? { ...r, status: 'completed', gateCode: '', checkedOutAt: now.toISOString(), accessRevokedAt: now.toISOString() } : r),
+      returns: prev.returns.map(r => r.id === returnId ? { ...r, status: 'completed', customerConfirmed: true, customerConfirmedAt: now.toISOString(), customerDecision: 'accepted', customerDecisionNote: note?.trim(), completedAt: now.toISOString(), refundTransaction: returnCase.netRefundAmount > 0 ? { id: refundId, type: 'refund', amount: returnCase.netRefundAmount, status: 'paid', recordedAt: now.toISOString() } : undefined } : r),
+      accessCredentials: prev.accessCredentials.map(ac => ac.rentalId === rental.id ? { ...ac, status: 'REVOKED', revokedAt: now.toISOString() } : ac),
+      maintenanceTasks: maintenanceTask ? [maintenanceTask, ...prev.maintenanceTasks] : prev.maintenanceTasks,
+      activities: [{ id: `act-${Date.now()}`, action: 'RETURN_SETTLEMENT_CONFIRMED', actorId: customer.id, actorName: customer.name, actorRole: customer.role, facilityId: returnCase.facilityId, entityType: 'return', entityId: returnId, notes: `Khách hàng xác nhận quyết toán. Hoàn cọc $${returnCase.netRefundAmount}.`, timestamp: now.toLocaleString('vi-VN') }, ...prev.activities]
+    }))
+  }
+
+  const reviewReturnDispute = (returnId: string, manager: User, resolutionNote?: string) => {
+    if (manager.role !== 'manager' && manager.role !== 'admin') throw new Error('Chỉ Facility Manager được xử lý khiếu nại quyết toán.')
+    const returnCase = state.returns.find(r => r.id === returnId)
+    if (!returnCase || returnCase.status !== 'disputed') throw new Error('Không tìm thấy hồ sơ khiếu nại đang chờ xử lý.')
+    const now = new Date()
+    setState(prev => ({
+      ...prev,
+      returns: prev.returns.map(r => r.id === returnId ? { ...r, status: 'awaiting_customer_confirmation', staffNotes: `${r.staffNotes || ''}${r.staffNotes ? ' · ' : ''}Manager: ${resolutionNote?.trim() || 'Đã rà soát và giữ nguyên quyết toán.'}` } : r),
+      activities: [{ id: `act-${Date.now()}`, action: 'RETURN_DISPUTE_REVIEWED', actorId: manager.id, actorName: manager.name, actorRole: manager.role, facilityId: returnCase.facilityId, entityType: 'return', entityId: returnId, notes: resolutionNote?.trim() || 'Manager đã rà soát và gửi lại quyết toán cho khách.', timestamp: now.toLocaleString('vi-VN') }, ...prev.activities]
     }))
   }
 
@@ -1969,20 +2123,52 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
   }
 
   const scheduleCheckIn = (holdId: string, appointmentDate: string, appointmentTime: string) => {
-    setState(prev => ({
-      ...prev,
-      holds: prev.holds.map(h => {
+    setState(prev => {
+      const reservation = prev.holds.find(h => h.id === holdId)
+      if (!reservation) return prev
+      if (!appointmentTime) throw new Error('Vui lòng chọn khung giờ Check-in.')
+      const requestedDate = toValidDate(appointmentDate)
+      requestedDate.setHours(0, 0, 0, 0)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const paidAt = reservation.depositPaidAt || reservation.payment.paidAt
+      const deadline = reservation.checkInDeadline
+        ? toValidDate(reservation.checkInDeadline)
+        : new Date(toValidDate(paidAt || reservation.createdAt).getTime() + 14 * 24 * 60 * 60 * 1000)
+      deadline.setHours(23, 59, 59, 999)
+      if (requestedDate < today || requestedDate > deadline) {
+        throw new Error(`Lịch Check-in phải từ hôm nay đến ${toDateInputValue(deadline)} (trong 14 ngày sau khi đóng cọc).`)
+      }
+      const nextEndDate = addCalendarMonths(appointmentDate, reservation.rentalMonths)
+      if (reservation.assignedUnitId) {
+        const hasConflict = prev.holds.some(h => h.id !== holdId && h.assignedUnitId === reservation.assignedUnitId && ['DEPOSIT_PAID', 'UNIT_RESERVED', 'READY_FOR_CHECKIN'].includes(h.status) && checkDateOverlap(appointmentDate, nextEndDate, h.startDate, h.endDate)) || prev.rentals.some(r => r.unitId === reservation.assignedUnitId && r.status === 'active' && checkDateOverlap(appointmentDate, nextEndDate, r.startDate, r.endDate))
+        if (hasConflict) throw new Error('Lịch mới xung đột với khoảng thuê khác của gian kho đã phân. Vui lòng chọn ngày khác.')
+      }
+      const existingCheckin = prev.checkins.find(c => c.holdId === holdId)
+      const nextCheckins = existingCheckin
+        ? prev.checkins.map(c => c.holdId === holdId ? { ...c, scheduledDate: appointmentDate, scheduledTime: appointmentTime } : c)
+        : reservation.assignedUnitId
+          ? [{ id: `CHK-${Date.now().toString().slice(-6)}`, holdId: reservation.id, unitId: reservation.assignedUnitId, facilityId: reservation.facilityId, customerId: reservation.customerId, customerName: reservation.customerName, staffId: '', staffName: 'Chưa phân công', scheduledDate: appointmentDate, scheduledTime: appointmentTime, status: 'scheduled' as const, checklist: { identityVerified: false, termsAccepted: false, paymentConfirmed: reservation.payment.status === 'paid', unitWalkthrough: false, accessCodeIssued: false }, actualMeasurements: { lengthCm: reservation.goods.lengthCm, widthCm: reservation.goods.widthCm, heightCm: reservation.goods.heightCm, weightKg: reservation.goods.weightKg, actualVolumeM3: (reservation.goods.lengthCm * reservation.goods.widthCm * reservation.goods.heightCm * reservation.goods.packageCount) / 1000000, varianceAccepted: false }, initialCondition: '', evidencePhotos: [] }, ...prev.checkins]
+          : prev.checkins
+      return {
+        ...prev,
+        holds: prev.holds.map(h => {
         if (h.id === holdId) {
           return {
             ...h,
             appointmentDate,
             appointmentTime,
-            status: h.status === 'DEPOSIT_PAID' || h.status === 'UNIT_RESERVED' ? 'scheduled' : h.status
+            moveInDate: appointmentDate,
+            startDate: appointmentDate,
+            endDate: nextEndDate
           }
         }
         return h
-      })
-    }))
+        }),
+        checkins: nextCheckins,
+        units: prev.units.map(unit => unit.id === reservation.assignedUnitId ? { ...unit, reservedPeriods: (unit.reservedPeriods || []).map(period => period.reservationId === holdId ? { ...period, startDate: appointmentDate, endDate: nextEndDate } : period), nextAvailableDate: nextEndDate } : unit)
+      }
+    })
   }
 
   const contextValue: StorageHubContextValue = {
@@ -2002,12 +2188,15 @@ export function StorageHubProvider({ children }: { children: ReactNode }) {
     recordRemainingPayment,
     payRemainingBalance,
     completeCheckIn,
+    confirmUnitReceipt,
     requestRenewal,
     approveRenewal,
     rejectRenewal,
     payRenewal,
     requestReturn,
     completeReturnInspection,
+    confirmReturnSettlement,
+    reviewReturnDispute,
     createMaintenanceTask,
     completeMaintenanceTask,
     releaseMaintenanceUnit,

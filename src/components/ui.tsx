@@ -1,4 +1,4 @@
-import { type ReactNode, type HTMLAttributes } from 'react'
+import { type ReactNode, type HTMLAttributes, type InputHTMLAttributes } from 'react'
 
 // ─── Badge ───────────────────────────────────────────────────────────────────
 
@@ -149,7 +149,7 @@ export function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md'
 
 // ─── Input ───────────────────────────────────────────────────────────────────
 
-interface InputProps extends HTMLAttributes<HTMLInputElement> {
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
   type?: string
   value?: string

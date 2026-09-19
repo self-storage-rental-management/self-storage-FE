@@ -328,7 +328,7 @@ export default function Layout({
             <button
               type="button"
               onClick={() => setNotificationsOpen(open => !open)}
-              className="relative text-stone-400 hover:text-stone-700 transition p-2 rounded-lg hover:bg-stone-100"
+              className={`relative text-stone-400 hover:text-stone-700 transition p-2 rounded-lg hover:bg-stone-100 ${roleLabel === 'Customer' ? 'customer-notification-bell' : ''}`}
               aria-label={lang === 'vi' ? 'Xem thông báo' : 'View notifications'}
               title={lang === 'vi' ? 'Thông báo' : 'Notifications'}
               aria-expanded={notificationsOpen}

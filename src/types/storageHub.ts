@@ -40,7 +40,7 @@ export type RentalStatus = 'active' | 'return_requested' | 'return_inspection' |
 
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'refunded' | 'cancelled'
 
-export type ReturnStatus = 'requested' | 'scheduled' | 'inspected' | 'completed'
+export type ReturnStatus = 'requested' | 'scheduled' | 'inspected' | 'awaiting_customer_confirmation' | 'disputed' | 'refund_pending' | 'completed'
 
 export type DamageClassification =
   | 'no_damage'
@@ -213,6 +213,7 @@ export interface StorageReservation {
   customerName: string
   customerEmail: string
   customerPhone: string
+  customerAddress?: string
   identityId: string
   facilityId: string
   facilityName: string
@@ -237,6 +238,8 @@ export interface StorageReservation {
   exceptionDetails?: string
   suggestedUnitType?: string
   paymentExpiresAt?: string
+  depositPaidAt?: string
+  checkInDeadline?: string
   reviewExpiresAt?: string
   largestItemDimensionsCm?: {
     lengthCm: number
@@ -394,6 +397,7 @@ export interface RenewalRecord {
   customerName: string
   oldEndDate: string
   newEndDate: string
+  renewalMonths: number
   renewalFee: number
   status: 'pending' | 'approved' | 'rejected' | 'completed'
   requestedAt: string
@@ -455,6 +459,8 @@ export interface RentalRecord {
   discountAmount?: number
   checkedOutAt?: string
   accessRevokedAt?: string
+  receiptConfirmedAt?: string
+  receiptConfirmedBy?: string
   // Optional legacy fields for backward-compatibility during refactoring
   size?: number
   sqft?: number
@@ -490,10 +496,14 @@ export interface ReturnCase {
   staffNotes?: string
   evidence: string[]
   customerConfirmed: boolean
+  customerConfirmedAt?: string
+  customerDecision?: 'accepted' | 'disputed'
+  customerDecisionNote?: string
+  proposedUnitStatus?: 'available' | 'maintenance'
   completedAt?: string
   staffId?: string
   returnedItems?: { key: boolean; card: boolean; lock: boolean }
-  refundTransaction?: { id: string; type: 'refund'; amount: number; status: 'pending'; recordedAt: string }
+  refundTransaction?: { id: string; type: 'refund'; amount: number; status: 'pending' | 'paid'; recordedAt: string }
 }
 
 export interface ActivityRecord {
