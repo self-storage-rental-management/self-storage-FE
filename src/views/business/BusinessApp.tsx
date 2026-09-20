@@ -5,6 +5,7 @@ import { Badge, Button, Card, StatCard, Table, Thead, Tbody, Th, Td, Tr, Section
 import type { User } from '../../types'
 import { FACILITIES, REVENUE_TREND, CONVERSION_DATA, PRICING_TIERS, DISCOUNTS, POLICIES, FEES, type PromotionItem } from "../../data/demoDatabase"
 import { useLanguage } from '../../i18n/LanguageContext'
+import { useStorageHub } from '../../store/StorageHubContext'
 import ProfileView from '../ProfileView'
 
 export default function BusinessApp({ user, onLogout }: { user: User; onLogout: () => void }) {
@@ -15,7 +16,6 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
     { id: 'performance', label: lang === 'vi' ? 'Hiệu suất vận hành' : 'Performance Reports', icon: Icon.eye, group: lang === 'vi' ? 'Danh mục' : 'Portfolio' },
     { id: 'policies', label: lang === 'vi' ? 'Chính sách thuê' : 'Rental Policies', icon: Icon.policy, group: lang === 'vi' ? 'Thương mại' : 'Commercial' },
     { id: 'pricing', label: lang === 'vi' ? 'Bảng giá & Phí' : 'Pricing & Fees', icon: Icon.dollar, group: lang === 'vi' ? 'Thương mại' : 'Commercial' },
-    { id: 'discounts', label: lang === 'vi' ? 'Khuyến mãi & Voucher' : 'Discounts & Promotions', icon: Icon.tag, group: lang === 'vi' ? 'Thương mại' : 'Commercial' },
     { id: 'revenue', label: lang === 'vi' ? 'Báo cáo doanh thu' : 'Revenue Reports', icon: Icon.chart, group: lang === 'vi' ? 'Báo cáo' : 'Reporting' },
   ]
 
@@ -39,6 +39,9 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
   const [newPromoMaxUses, setNewPromoMaxUses] = useState('50')
   const [newPromoMinMonths, setNewPromoMinMonths] = useState('3')
   const [newPromoExpiry, setNewPromoExpiry] = useState('2026-12-31')
+
+  const { config, updateBusinessConfig } = useStorageHub()
+  const [dimDivisorInput, setDimDivisorInput] = useState(config.dimDivisor)
 
   // Toast
   const [toast, setToast] = useState<string | null>(null)
@@ -127,6 +130,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
               <Thead>
                 <tr>
                   <Th>{lang === 'vi' ? 'Tên Chính Sách' : 'Policy Name'}</Th>
+                  <Th>{lang === 'vi' ? 'Mô Tả Điều Khoản' : 'Description'}</Th>
                   <Th>{lang === 'vi' ? 'Giá Trị Áp Dụng' : 'Current Value'}</Th>
                   <Th>{lang === 'vi' ? 'Phạm Vi' : 'Scope'}</Th>
                   <Th className="text-right">{lang === 'vi' ? 'Thao Tác' : 'Action'}</Th>
@@ -135,20 +139,26 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
               <Tbody>
                 {POLICIES.map(p => (
                   <Tr key={p.id}>
-                    <Td className="font-medium text-slate-800">
+                    <Td className="font-semibold text-slate-800">
                       {lang === 'vi' ? (
                         p.name === 'Grace Period' ? 'Thời gian gia hạn nợ' :
                         p.name === 'Late Fee' ? 'Mức phí phạt trễ hạn' :
                         p.name === 'Security Deposit' ? 'Tiền đặt cọc an ninh' :
-                        p.name === 'Notice to Vacate' ? 'Thời hạn báo trước khi trả phòng' :
-                        p.name === 'Minimum Lease' ? 'Thời hạn thuê tối thiểu' : p.name
+                        p.name === 'Notice to Vacate' ? 'Thời hạn báo trước khi trả kho' :
+                        p.name === 'Minimum Lease' ? 'Thời hạn thuê tối thiểu' :
+                        p.name === 'Hold Reservation TTL' ? 'Thời gian giữ kho tạm' :
+                        p.name === 'Digital Gate Access' ? 'Quyền ra vào cổng 24/7' : p.name
                       ) : p.name}
                     </Td>
-                    <Td>
+                    <Td className="text-xs text-slate-500 max-w-md">
+                      {lang === 'vi' ? p.descriptionVi : p.description}
+                    </Td>
+                    <Td className="font-mono font-medium text-amber-700">
                       {lang === 'vi' ? (
-                        p.value.includes('days') ? p.value.replace('days', 'ngày') :
-                        p.value.includes('month') ? p.value.replace('month', 'tháng') : p.value
-                      ) : p.value}
+                        (p.value ?? '').includes('days') ? (p.value ?? '').replace('days', 'ngày') :
+                        (p.value ?? '').includes('month') ? (p.value ?? '').replace('month', 'tháng') :
+                        (p.value ?? '').includes('hours') ? (p.value ?? '').replace('hours', 'giờ') : (p.value ?? '')
+                      ) : (p.value ?? '')}
                     </Td>
                     <Td><Badge variant="muted">{lang === 'vi' ? (p.scope === 'All Facilities' ? 'Toàn bộ cơ sở' : p.scope) : p.scope}</Badge></Td>
                     <Td className="text-right">
@@ -171,15 +181,54 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
         <div className="fade-in">
           <SectionHeader
             title={lang === 'vi' ? 'Bảng Giá Niêm Yết & Biểu Phí' : 'Pricing & Fees'}
-            subtitle={lang === 'vi' ? 'Quản lý các phân tầng giá theo kích thước và biểu phí dịch vụ phát sinh' : 'Manage unit pricing tiers and fee schedules'}
+            subtitle={lang === 'vi' ? 'Quản lý các phân tầng giá theo kích thước, cấu hình DIM và biểu phí dịch vụ phát sinh' : 'Manage unit pricing tiers, DIM configuration and fee schedules'}
           />
+
+          {/* DIM & Business Configuration Card (P1.1) */}
+          <Card className="p-5 mb-6 border-l-4 border-l-blue-600">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-base text-slate-900">
+                  {lang === 'vi' ? 'Quy Chuẩn Tính Trọng Lượng Thể Tích (DIM Configuration)' : 'DIM Volume-Weight Configuration'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  {lang === 'vi' ? 'Hệ số chia thể tích áp dụng cho toàn hệ thống khi khách hàng khai báo kích thước kiện hàng.' : 'System-wide volumetric divisor applied during goods declaration.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-700">DIM Divisor:</span>
+                  <input
+                    type="number"
+                    value={dimDivisorInput}
+                    onChange={e => setDimDivisorInput(Number(e.target.value))}
+                    className="w-24 border border-slate-300 rounded px-2 py-1 text-sm font-bold text-blue-700"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    updateBusinessConfig({ dimDivisor: dimDivisorInput }, user)
+                    showToast(lang === 'vi' ? `Đã cập nhật hệ số DIM thành ${dimDivisorInput}!` : `DIM divisor set to ${dimDivisorInput}!`)
+                  }}
+                >
+                  {lang === 'vi' ? 'Áp dụng' : 'Apply'}
+                </Button>
+              </div>
+            </div>
+            <div className="mt-3 text-xs bg-blue-50 p-2.5 rounded text-blue-900 flex items-center justify-between">
+              <span>Công thức hiện hành: <b>DIM (kg) = Dài × Rộng × Cao (cm) / {config.dimDivisor}</b></span>
+              <span>Thời gian khóa giữ kho tạm thời: <b>{config.holdExpiryHours} giờ</b></span>
+            </div>
+          </Card>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             {PRICING_TIERS.map(tier => (
               <Card key={tier.type} className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-bold text-slate-900">{tier.type}</h3>
-                    <p className="text-xs text-slate-400">{tier.sizes} ft</p>
+                    <p className="text-xs text-slate-400">{tier.sizes}</p>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => { setSelectedTier(tier); setPricingModal(true) }}>
                     {lang === 'vi' ? 'Sửa' : 'Edit'}
@@ -586,7 +635,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
                     <Td>{lang === 'vi' ? '14.2 tháng' : '14.2 mo'}</Td>
                     <Td>3.4%</Td>
                     <Td>
-                      <div className="flex items-center gap-1 text-amber-500">★ 4.8</div>
+                      <div className="flex items-center gap-1 text-amber-500"> 4.8</div>
                     </Td>
                     <Td className="font-semibold">${Math.round(f.revenue / f.occupied)}/{lang === 'vi' ? 'th' : 'mo'}</Td>
                   </Tr>
@@ -616,7 +665,7 @@ export default function BusinessApp({ user, onLogout }: { user: User; onLogout: 
       <Modal open={pricingModal} onClose={() => setPricingModal(false)} title={lang === 'vi' ? 'Chỉnh Sửa Phân Tầng Giá' : 'Edit Pricing Tier'}>
         {selectedTier && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-500">{lang === 'vi' ? 'Đang chỉnh sửa:' : 'Editing:'} <strong>{selectedTier.type}</strong> ({selectedTier.sizes} ft)</p>
+            <p className="text-sm text-slate-500">{lang === 'vi' ? 'Đang chỉnh sửa:' : 'Editing:'} <strong>{selectedTier.type}</strong> ({selectedTier.sizes})</p>
             <Input label={lang === 'vi' ? 'Giá cơ sở ($/tháng)' : 'Base Price ($/mo)'} type="number" defaultValue={selectedTier.basePrice.toString()} />
             <Input label={lang === 'vi' ? 'Phụ phí điều hòa ($/tháng)' : 'Climate Control Adder ($/mo)'} type="number" defaultValue={selectedTier.climateAdder.toString()} />
             <Input label={lang === 'vi' ? 'Hệ số cao điểm' : 'High Demand Multiplier'} type="number" defaultValue={selectedTier.highDemandMultiplier.toString()} />
