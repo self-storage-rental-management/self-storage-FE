@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
-import Layout, { getInitialPage, Icon } from '../../components/Layout'
+
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
+import Layout, { getInitialPage, Icon, type LayoutNotification } from '../../components/Layout'
+
 import { Badge, Button, Card, StatCard, Table, Thead, Tbody, Th, Td, Tr, SectionHeader, Modal, Select, ProgressBar, Avatar, Input, Tabs } from '../../components/ui'
 import type { User } from '../../types'
 import { OCCUPANCY_DATA, REVENUE_DATA, UNIT_TYPE_DATA, UNITS, RENTALS, STAFF_LIST, OVERDUE, UTILIZATION, SUPPORT_METRICS } from "../../data/demoDatabase"
@@ -71,7 +73,7 @@ export default function ManagerApp({ user, onLogout }: { user: User; onLogout: (
     setTimeout(() => setToast(null), 3000)
   }
 
-  const filteredUnits = UNITS.filter(u => {
+
     if (unitTab === 'All' || unitTab === 'Tất cả') return true
     if (unitTab === 'Available' || unitTab === 'Còn trống') return u.status === 'available'
     if (unitTab === 'Occupied' || unitTab === 'Đã thuê') return u.status === 'occupied'
@@ -86,6 +88,8 @@ export default function ManagerApp({ user, onLogout }: { user: User; onLogout: (
     <Layout
       user={user} navItems={NAV} currentPage={page} onNavigate={setPage} onLogout={onLogout}
       roleLabel={lang === 'vi' ? 'Quản Lý Cơ Sở' : 'Facility Manager'} roleColor="bg-purple-100 text-purple-700"
+      notifications={managerNotifications}
+      onNotificationClick={handleManagerNotification}
     >
       {/* ── DASHBOARD ─────────────────────────────────────────── */}
       {page === 'dashboard' && (
@@ -185,6 +189,168 @@ export default function ManagerApp({ user, onLogout }: { user: User; onLogout: (
             subtitle={lang === 'vi' ? `Tổng cộng ${totalUnits} gian kho · ${occupiedCount} đang có khách thuê` : `${totalUnits} units total · ${occupiedCount} occupied`}
             action={<Button variant="primary" size="sm" onClick={() => setEditModal(true)}>{Icon.plus} {lang === 'vi' ? 'Thêm Gian Kho' : 'Add Unit'}</Button>}
           />
+
+          {/* 1. Unit Type DIM Pricing Breakdown (Standard Business Rule) */}
+          <div className="mb-6 rounded-xl border border-stone-200 bg-white p-5 shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 pb-3">
+              <div>
+                <h3 className="font-bold text-stone-900 text-sm flex items-center gap-2">
+                  <span></span>
+                  <span>{lang === 'vi' ? 'Quy Chuẩn Định Giá Thể Tích DIM Theo Loại Kho (Unit Type DIM Pricing)' : 'Unit Type DIM Pricing Configuration'}</span>
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  {lang === 'vi'
+                    ? 'Giá thuê cơ sở hàng tháng được cố định theo thể tích DIM (Dài × Rộng × Cao × Đơn giá/m³), tính 1 lần khi tạo loại kho.'
+                    : 'Base monthly rental price is determined once per unit type by multiplying DIM volume by price per cubic meter.'}
+                </p>
+              </div>
+              <Badge variant="info">
+                {lang === 'vi' ? 'Quy tắc định giá chuẩn SWP391' : 'Fixed UnitType DIM Rule'}
+              </Badge>
+            </div>
+
+            {/* Business Rule Formula Callout */}
+            <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 text-xs text-stone-700 space-y-1">
+              <p className="font-semibold text-stone-900 font-mono">
+                DIM = Length × Width × Height (m) &nbsp;|&nbsp; Base Monthly Price = DIM × Price Per Cubic Meter
+              </p>
+              <p className="text-[11px] text-stone-500 leading-relaxed">
+                {lang === 'vi'
+                  ? 'Khách hàng chỉ nhìn thấy loại gian kho và giá thuê niêm yết cố định (ví dụ: Medium 15m³: $150/tháng). Khai báo hàng hóa chỉ sử dụng trong kiểm tra tương thích vật lý (DIM & Trọng tải sàn), không làm thay đổi giá thuê cơ sở.'
+                  : 'Customers only see the fixed package price. Cargo declaration is strictly evaluated for physical fit, not dynamic repricing.'}
+              </p>
+            </div>
+
+            {/* Unit Types Table */}
+            <div className="overflow-x-auto">
+              <Table>
+                <Thead>
+                  <tr>
+                    <Th>{lang === 'vi' ? 'Loại Gian Kho' : 'Unit Type'}</Th>
+                    <Th>{lang === 'vi' ? 'Kích Thước Chuẩn (D × R × C)' : 'Dimensions (L × W × H)'}</Th>
+                    <Th>{lang === 'vi' ? 'Thể Tích DIM (m³)' : 'DIM Volume (m³)'}</Th>
+                    <Th>{lang === 'vi' ? 'Đơn Giá Cơ Sở ($/m³)' : 'Price Per m³'}</Th>
+                    <Th className="text-right">{lang === 'vi' ? 'Giá Niêm Yết Cố Định / Tháng' : 'Base Monthly Price'}</Th>
+                  </tr>
+                </Thead>
+                <Tbody>
+                  {UNIT_TYPES.map(ut => (
+                    <Tr key={ut.id}>
+                      <Td className="font-bold text-stone-900">
+                        {ut.name}
+                        <span className="block text-[11px] font-normal text-stone-500">ID: {ut.id}</span>
+                      </Td>
+                      <Td className="font-mono text-xs">{ut.length}m × {ut.width}m × {ut.height}m</Td>
+                      <Td className="font-bold text-stone-800">{ut.volumeM3} m³</Td>
+                      <Td className="font-mono">${ut.pricePerM3}/m³</Td>
+                      <Td className="text-right font-mono font-bold text-emerald-700 text-sm">
+                        ${ut.monthlyPrice} <span className="text-[11px] font-normal text-stone-500">/ {lang === 'vi' ? 'tháng' : 'mo'}</span>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </div>
+          </div>
+
+          {/* 2. Unassigned Units Queue (Holds paid & confirmed awaiting specific unit assignment) */}
+          {(() => {
+            const unassignedHolds = pendingAssignmentHolds
+            if (!unassignedHolds.length) return null
+
+            return (
+              <div className="mb-6 rounded-xl border-2 border-amber-400 bg-amber-50/70 p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-800 font-bold text-sm"> {lang === 'vi' ? 'Hàng Đợi Phân Bổ Gian Kho Cụ Thể (Unassigned Holds)' : 'Pending Unit Assignment Queue'}</span>
+                    <Badge variant="warning">{unassignedHolds.length} {lang === 'vi' ? 'đơn cần xếp kho' : 'pending'}</Badge>
+                  </div>
+                  <p className="text-[11px] text-amber-900">
+                    {lang === 'vi'
+                      ? 'Kiểm tra xung đột ngày: newStart < existingEnd AND newEnd > existingStart. Chỉ gán khi không có overlap.'
+                      : 'Date conflict rule: newStart < existingEnd AND newEnd > existingStart.'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  {unassignedHolds.map(hold => {
+                    // Filter suitable units at facility matching type, not in maintenance, and no date overlap
+                    const suitableAvailableUnits = facilityUnits.filter(u => {
+                      if (u.facilityId !== hold.facilityId) return false
+                      if (!u.type.toLowerCase().includes((hold.unitTypeName || '').split(' ')[0].toLowerCase())) return false
+                      if (u.status === 'maintenance') return false
+
+                      const hasReservationOverlap = storeHolds.some(
+                        h => h.id !== hold.id && h.assignedUnitId === u.id &&
+                             ['DEPOSIT_PAID', 'UNIT_RESERVED', 'READY_FOR_CHECKIN'].includes(h.status) &&
+                             checkDateOverlap(hold.startDate, hold.endDate, h.startDate, h.endDate)
+                      )
+                      const hasRentalOverlap = storeRentals.some(
+                        r => r.unitId === u.id && r.status === 'active' &&
+                             checkDateOverlap(hold.startDate, hold.endDate, r.startDate, r.endDate)
+                      )
+                      return !hasReservationOverlap && !hasRentalOverlap
+                    })
+
+                    return (
+                      <div id={`manager-assignment-${hold.id}`} key={hold.id} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-3 text-xs transition-all duration-300 ${focusedAssignmentId === hold.id ? 'relative z-10 -translate-y-1 border-amber-500 ring-4 ring-amber-300/70 shadow-xl' : 'border-amber-200'}`}>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-amber-800">{hold.id}</span>
+                            <span className="font-semibold text-stone-900">{hold.customerName}</span>
+                            <Badge variant="purple">{hold.unitTypeName || 'Gian kho'}</Badge>
+                          </div>
+                          <p className="text-stone-500 text-[11px] mt-0.5">
+                            Cơ sở: <b>{hold.facilityName}</b> · Khoảng thuê: <b className="text-stone-800">{hold.startDate} → {hold.endDate}</b> ({hold.rentalMonths} tháng) · Đã cọc 20%: <b className="text-emerald-700">${hold.reservationDepositAmount ?? hold.payment.amount}</b>
+                          </p>
+                          <p className="text-amber-800 text-[11px]">
+                            {lang === 'vi' ? `Kho khả dụng không xung đột ngày: ${suitableAvailableUnits.length} gian kho` : `${suitableAvailableUnits.length} conflict-free units available`}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <select
+                            className="rounded border border-stone-300 bg-stone-50 px-2 py-1 text-xs"
+                            value={selectedHoldToAssign === hold.id ? targetUnitForHold : ''}
+                            onChange={e => {
+                              setSelectedHoldToAssign(hold.id)
+                              setTargetUnitForHold(e.target.value)
+                            }}
+                          >
+                            <option value="">-- {lang === 'vi' ? 'Chọn gian kho không xung đột' : 'Select conflict-free unit'} --</option>
+                            {suitableAvailableUnits.map(u => (
+                              <option key={u.id} value={u.id}>
+                                {u.code} ({u.type} · {u.areaM2} m² · Tầng {u.floor})
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            size="sm"
+                            disabled={selectedHoldToAssign !== hold.id || !targetUnitForHold}
+                            onClick={() => {
+                              if (selectedHoldToAssign && targetUnitForHold) {
+                                try {
+                                  assignUnitToHold(selectedHoldToAssign, targetUnitForHold, user)
+                                  showToast(lang === 'vi' ? `Đã phân kho ${targetUnitForHold} cho đơn ${selectedHoldToAssign}!` : `Unit assigned!`)
+                                  setSelectedHoldToAssign(null)
+                                  setTargetUnitForHold('')
+                                } catch (err: any) {
+                                  showToast(err?.message || 'Error assigning unit')
+                                }
+                              }
+                            }}
+                          >
+                             {lang === 'vi' ? 'Phân Bổ' : 'Assign'}
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
           <div className="mb-4">
             <Tabs
               tabs={lang === 'vi' ? ['Tất cả', 'Còn trống', 'Đã thuê', 'Bảo trì', 'Đã đặt'] : ['All', 'Available', 'Occupied', 'Maintenance', 'Reserved']}
@@ -277,6 +443,107 @@ export default function ManagerApp({ user, onLogout }: { user: User; onLogout: (
                 </div>
               }
             />
+
+            {(() => {
+              const disputedReturns = storeReturns.filter(item => item.status === 'disputed' && (!user.facility || item.facilityName === user.facility || user.facility === 'All facilities'))
+              if (!disputedReturns.length) return null
+              return <div className="space-y-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4 shadow-sm"><div className="flex items-center justify-between gap-3"><p className="text-sm font-bold text-amber-950">{lang === 'vi' ? 'Yêu cầu xem xét lại quyết toán trả kho' : 'Return settlement disputes'}</p><Badge variant="warning">{disputedReturns.length}</Badge></div>{disputedReturns.map(item => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white p-3 text-xs"><div><p className="font-bold text-stone-950">{item.id} · {item.customerName} · {item.unitId}</p><p className="mt-1 text-stone-600">{item.customerDecisionNote}</p><p className="mt-1 text-stone-500">{lang === 'vi' ? 'Hoàn cọc đề xuất' : 'Proposed refund'}: <b>${item.netRefundAmount}</b></p></div><Button size="sm" onClick={() => { const note = window.prompt(lang === 'vi' ? 'Kết luận rà soát gửi lại khách hàng:' : 'Review note for customer:', 'Đã kiểm tra chứng cứ và giữ nguyên quyết toán.'); if (note !== null) { try { reviewReturnDispute(item.id, user, note); showToast(lang === 'vi' ? 'Đã gửi lại quyết toán cho khách xác nhận.' : 'Settlement returned to customer.') } catch (error) { showToast(error instanceof Error ? error.message : 'Không thể xử lý khiếu nại.') } } }}>{lang === 'vi' ? 'Hoàn tất rà soát' : 'Complete review'}</Button></div>)}</div>
+            })()}
+
+            {/* Pending Renewal Approval Queue */}
+            {(() => {
+              const pendingRenewals = storeRenewals.filter(r => r.status === 'pending')
+              if (!pendingRenewals.length) return null
+
+              return (
+                <div className="rounded-xl border-2 border-blue-400 bg-blue-50/70 p-4 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-900 font-bold text-sm"> {lang === 'vi' ? 'Hàng Đợi Duyệt Yêu Cầu Gia Hạn Thuê (Renewals Queue)' : 'Pending Renewal Approvals'}</span>
+                      <Badge variant="info">{pendingRenewals.length} {lang === 'vi' ? 'yêu cầu' : 'requests'}</Badge>
+                    </div>
+                    <p className="text-[11px] text-blue-800">
+                      {lang === 'vi' ? 'Manager kiểm tra xung đột ngày trước khi duyệt. Sau khi duyệt, khách thanh toán cước gia hạn.' : 'Check date conflicts before approving.'}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    {pendingRenewals.map(rnw => {
+                      const hasConflict = storeHolds.some(
+                        h => h.assignedUnitId === rnw.unitId &&
+                             ['DEPOSIT_PAID', 'UNIT_RESERVED', 'READY_FOR_CHECKIN'].includes(h.status) &&
+                             checkDateOverlap(rnw.oldEndDate, rnw.newEndDate, h.startDate, h.endDate)
+                      )
+
+                      return (
+                        <div key={rnw.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-white p-3 text-xs">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-blue-900">{rnw.id}</span>
+                              <span className="font-semibold text-stone-900">{rnw.customerName}</span>
+                              <span className="font-mono font-bold text-emerald-800">Kho {rnw.unitId}</span>
+                            </div>
+                            <p className="text-stone-500 text-[11px] mt-0.5">
+                              Gói: <b>{rnw.renewalMonths || 1} tháng</b> · Hạn cũ: <b>{rnw.oldEndDate}</b> → Hạn mới: <b className="text-blue-900">{rnw.newEndDate}</b> · Cước: <b>${rnw.renewalFee}</b>
+                            </p>
+                            {rnw.updatedAt && <p className="mt-1 font-bold text-amber-700">● {lang === 'vi' ? `Customer vừa chỉnh sửa lúc ${new Date(rnw.updatedAt).toLocaleString('vi-VN')}. Vui lòng xét duyệt theo thông tin mới.` : `Customer updated this request at ${new Date(rnw.updatedAt).toLocaleString('en-US')}. Review the latest details.`}</p>}
+                            {hasConflict ? (
+                              <p className="text-red-600 font-bold text-[11px]">
+                                ⚠️ Cảnh báo: Trùng lịch với đơn đặt giữ kho khác trên kho {rnw.unitId}!
+                              </p>
+                            ) : (
+                              <p className="text-emerald-700 font-semibold text-[11px]">
+                                 Không có xung đột lịch. Đủ điều kiện phê duyệt.
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-700 hover:bg-red-50 border-red-300"
+                              onClick={() => {
+                                setRenewalRejectId(rnw.id)
+                                setRenewalRejectReason('')
+                              }}
+                            >
+                              ✕ {lang === 'vi' ? 'Từ chối' : 'Reject'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={hasConflict}
+                              onClick={() => {
+                                try {
+                                  approveRenewal(rnw.id, user)
+                                  showToast(lang === 'vi' ? `Đã phê duyệt gia hạn kho ${rnw.unitId} đến ${rnw.newEndDate}!` : `Renewal approved!`)
+                                } catch (err: any) {
+                                  showToast(err?.message || 'Error approving renewal')
+                                }
+                              }}
+                            >
+                               {lang === 'vi' ? 'Duyệt Gia Hạn' : 'Approve'}
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {(() => {
+              const trackedRenewals = storeRenewals
+                .filter(item => ['approved', 'appointment_scheduled', 'payment_expired', 'cancelled', 'completed'].includes(item.status))
+                .filter(item => !user.facility || user.facility === 'All facilities' || storeUnits.some(unit => unit.facilityId === item.facilityId && unit.facilityName === user.facility))
+                .slice(0, 8)
+              if (!trackedRenewals.length) return null
+              return <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-bold text-stone-950">{lang === 'vi' ? 'Theo dõi gia hạn, cọc và lịch ký' : 'Renewal deposit and signing tracking'}</p><p className="text-[11px] text-stone-500">{lang === 'vi' ? 'Chỉ cập nhật hạn hợp đồng sau khi Staff xác nhận ký và thu đủ.' : 'The contract end date updates only after staff confirms signing and full payment.'}</p></div>
+                <div className="grid gap-2 lg:grid-cols-2">{trackedRenewals.map(item => <article key={item.id} className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-xs"><div className="flex items-start justify-between gap-3"><div><p className="font-bold text-stone-950">{item.id} · {item.customerName}</p><p className="mt-1 text-stone-600">Kho {item.unitId} · {item.oldEndDate} → {item.newEndDate}</p>{item.status === 'appointment_scheduled' && <p className="mt-1 font-semibold text-blue-700">{lang === 'vi' ? `Đã cọc $${item.bookingDepositAmount} · Hẹn ký ${item.appointmentDate} ${item.appointmentTime}` : `Deposit $${item.bookingDepositAmount} · Signing ${item.appointmentDate} ${item.appointmentTime}`}</p>}{item.status === 'cancelled' && <p className="mt-1 font-semibold text-red-700">{lang === 'vi' ? `Customer đã hủy lúc ${item.cancelledAt ? new Date(item.cancelledAt).toLocaleString('vi-VN') : '—'}. ${item.paidAt ? 'Cọc gia hạn không hoàn lại.' : 'Không tiếp tục xét duyệt.'}` : 'Customer cancelled this request.'}</p>}</div><Badge variant={item.status === 'completed' ? 'success' : ['payment_expired', 'cancelled'].includes(item.status) ? 'error' : 'warning'}>{item.status === 'completed' ? (lang === 'vi' ? 'Đã hoàn tất' : 'Completed') : item.status === 'appointment_scheduled' ? (lang === 'vi' ? 'Chờ ký tại cơ sở' : 'Awaiting signing') : item.status === 'payment_expired' ? (lang === 'vi' ? 'Hết hạn' : 'Expired') : item.status === 'cancelled' ? (lang === 'vi' ? 'Customer đã hủy' : 'Cancelled') : (lang === 'vi' ? 'Chờ cọc 20%' : 'Awaiting 20% deposit')}</Badge></div><div className="mt-3 grid gap-1 border-t border-stone-200 pt-2 text-stone-600 sm:grid-cols-2"><p>{lang === 'vi' ? 'Hóa đơn' : 'Invoice'}: <b>{item.invoiceNumber || '—'}</b></p><p>{lang === 'vi' ? 'Tổng kỳ gia hạn' : 'Renewal total'}: <b>${item.totalAmount ?? item.renewalFee}</b></p><p>{lang === 'vi' ? 'Cọc / còn lại' : 'Deposit / balance'}: <b>${item.bookingDepositAmount || 0} / ${item.remainingAmount || 0}</b></p><p>{lang === 'vi' ? 'Phụ thu trễ' : 'Late fee'}: <b>${item.lateFeeAmount || 0}</b></p><p>{lang === 'vi' ? 'Hạn thanh toán cọc' : 'Deposit due'}: <b>{item.paymentDueAt ? new Date(item.paymentDueAt).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US') : '—'}</b></p><p>{lang === 'vi' ? 'Phụ lục' : 'Addendum'}: <b>{item.addendumNumber || '—'}</b></p></div></article>)}</div>
+              </div>
+            })()}
 
             {/* KPI Stat Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1116,6 +1383,22 @@ export default function ManagerApp({ user, onLogout }: { user: User; onLogout: (
             </Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(renewalRejectId)}
+        onClose={() => { setRenewalRejectId(null); setRenewalRejectReason('') }}
+        title={lang === 'vi' ? 'Từ Chối Yêu Cầu Gia Hạn' : 'Reject Renewal Request'}
+      >
+        {renewalRejectId && (() => {
+          const renewal = storeRenewals.find(item => item.id === renewalRejectId)
+          if (!renewal) return null
+          return <div className="space-y-4">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-950"><p className="font-bold">{renewal.id} · {renewal.customerName}</p><p className="mt-1 text-xs">{lang === 'vi' ? `Gian kho ${renewal.unitId} · ${renewal.oldEndDate} → ${renewal.newEndDate} · ${renewal.renewalMonths} tháng` : `Unit ${renewal.unitId} · ${renewal.oldEndDate} → ${renewal.newEndDate} · ${renewal.renewalMonths} months`}</p></div>
+            <div className="space-y-1.5"><label className="text-sm font-semibold text-stone-800">{lang === 'vi' ? 'Lý do từ chối (bắt buộc)' : 'Rejection reason (required)'}</label><textarea rows={4} value={renewalRejectReason} onChange={event => setRenewalRejectReason(event.target.value)} placeholder={lang === 'vi' ? 'Nêu rõ nguyên nhân để Customer có thể điều chỉnh và gửi lại yêu cầu...' : 'Explain why the request was rejected so the customer can revise and resubmit...'} className="w-full resize-none rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100" /><p className="text-xs text-stone-500">{lang === 'vi' ? 'Nội dung này sẽ hiển thị trong hồ sơ và thông báo của Customer.' : 'This reason will appear in the customer record and notification.'}</p></div>
+            <div className="flex justify-end gap-2 border-t border-stone-100 pt-3"><Button variant="outline" onClick={() => { setRenewalRejectId(null); setRenewalRejectReason('') }}>{lang === 'vi' ? 'Quay lại' : 'Back'}</Button><Button disabled={!renewalRejectReason.trim()} className="bg-red-700 text-white hover:bg-red-800" onClick={() => { try { rejectRenewal(renewal.id, user, renewalRejectReason.trim()); setRenewalRejectId(null); setRenewalRejectReason(''); showToast(lang === 'vi' ? `Đã gửi từ chối yêu cầu ${renewal.id} cho Customer.` : `Rejection for ${renewal.id} was sent to the customer.`) } catch (error) { showToast(error instanceof Error ? error.message : 'Không thể từ chối yêu cầu gia hạn.') } }}>{lang === 'vi' ? 'Gửi từ chối yêu cầu' : 'Send rejection'}</Button></div>
+          </div>
+        })()}
       </Modal>
 
       {/* Enhanced Overdue Reminder Modal */}

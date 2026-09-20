@@ -6,15 +6,31 @@ export const FACILITIES = [
 ]
 
 export const UNITS = [
-  { id: 'A-104', size: 5, sqft: 25, floor: 1, type: 'Small', price: 89, climate: true, status: 'available', facility: 'Downtown Storage' },
-  { id: 'B-208', size: 10, sqft: 100, floor: 2, type: 'Medium', price: 149, climate: true, status: 'occupied', facility: 'Downtown Storage' },
-  { id: 'C-301', size: 20, sqft: 400, floor: 3, type: 'Large', price: 269, climate: false, status: 'available', facility: 'Downtown Storage' },
-  { id: 'A-115', size: 5, sqft: 25, floor: 1, type: 'Small', price: 85, climate: false, status: 'reserved', facility: 'Riverside Storage' },
-  { id: 'R-106', size: 5, sqft: 25, floor: 1, type: 'Small', price: 75, climate: false, status: 'available', facility: 'Riverside Storage' },
-  { id: 'R-214', size: 10, sqft: 100, floor: 2, type: 'Medium', price: 135, climate: false, status: 'available', facility: 'Riverside Storage' },
-  { id: 'R-305', size: 20, sqft: 400, floor: 3, type: 'Large', price: 245, climate: true, status: 'available', facility: 'Riverside Storage' },
-  { id: 'B-112', size: 10, sqft: 100, floor: 1, type: 'Medium', price: 155, climate: true, status: 'available', facility: 'Downtown Storage' },
-  { id: 'D-402', size: 25, sqft: 500, floor: 4, type: 'Extra Large', price: 349, climate: true, status: 'occupied', facility: 'Downtown Storage' },
+
+  { id: 'A-104', areaM2: 2.25, volumeM3: 6.3, floor: 1, type: 'Small', price: 89, climate: true, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 1.5, widthM: 1.5, heightM: 2.8 } },
+  { id: 'A-105', areaM2: 2.25, volumeM3: 6.3, floor: 1, type: 'Small', price: 89, climate: true, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 1.5, widthM: 1.5, heightM: 2.8 } },
+  { id: 'A-106', areaM2: 2.25, volumeM3: 6.3, floor: 1, type: 'Small', price: 89, climate: true, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 1.5, widthM: 1.5, heightM: 2.8 } },
+  { id: 'B-208', areaM2: 6.0, volumeM3: 15.0, floor: 2, type: 'Medium', price: 149, climate: true, status: 'occupied', facility: 'Downtown Storage', dimensions: { lengthM: 3.0, widthM: 2.0, heightM: 2.5 } },
+  { id: 'B-209', areaM2: 6.0, volumeM3: 15.0, floor: 2, type: 'Medium', price: 149, climate: true, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 3.0, widthM: 2.0, heightM: 2.5 } },
+  { id: 'B-210', areaM2: 6.0, volumeM3: 15.0, floor: 2, type: 'Medium', price: 149, climate: true, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 3.0, widthM: 2.0, heightM: 2.5 } },
+  { id: 'C-301', areaM2: 12.0, volumeM3: 30.0, floor: 3, type: 'Large', price: 269, climate: false, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 4.0, widthM: 3.0, heightM: 2.5 } },
+  { id: 'C-302', areaM2: 12.0, volumeM3: 30.0, floor: 3, type: 'Large', price: 269, climate: false, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 4.0, widthM: 3.0, heightM: 2.5 } },
+  { id: 'C-303', areaM2: 12.0, volumeM3: 30.0, floor: 3, type: 'Large', price: 269, climate: false, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 4.0, widthM: 3.0, heightM: 2.5 } },
+  { id: 'A-115', areaM2: 2.25, volumeM3: 6.3, floor: 1, type: 'Small', price: 85, climate: false, status: 'reserved', facility: 'Riverside Storage', dimensions: { lengthM: 1.5, widthM: 1.5, heightM: 2.8 } },
+  { id: 'R-106', areaM2: 2.25, volumeM3: 6.3, floor: 1, type: 'Small', price: 75, climate: false, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 1.5, widthM: 1.5, heightM: 2.8 } },
+  { id: 'R-107', areaM2: 2.25, volumeM3: 6.3, floor: 1, type: 'Small', price: 75, climate: false, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 1.5, widthM: 1.5, heightM: 2.8 } },
+  { id: 'R-214', areaM2: 6.0, volumeM3: 15.0, floor: 2, type: 'Medium', price: 135, climate: false, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 3.0, widthM: 2.0, heightM: 2.5 } },
+  { id: 'R-215', areaM2: 6.0, volumeM3: 15.0, floor: 2, type: 'Medium', price: 135, climate: false, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 3.0, widthM: 2.0, heightM: 2.5 } },
+  { id: 'R-216', areaM2: 6.0, volumeM3: 15.0, floor: 2, type: 'Medium', price: 135, climate: false, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 3.0, widthM: 2.0, heightM: 2.5 } },
+  { id: 'R-305', areaM2: 12.0, volumeM3: 30.0, floor: 3, type: 'Large', price: 245, climate: true, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 4.0, widthM: 3.0, heightM: 2.5 } },
+  { id: 'R-306', areaM2: 12.0, volumeM3: 30.0, floor: 3, type: 'Large', price: 245, climate: true, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 4.0, widthM: 3.0, heightM: 2.5 } },
+  { id: 'B-112', areaM2: 6.0, volumeM3: 15.0, floor: 1, type: 'Medium', price: 155, climate: true, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 3.0, widthM: 2.0, heightM: 2.5 } },
+  { id: 'D-402', areaM2: 18.0, volumeM3: 45.0, floor: 4, type: 'Extra Large', price: 349, climate: true, status: 'occupied', facility: 'Downtown Storage', dimensions: { lengthM: 6.0, widthM: 3.0, heightM: 2.5 } },
+  { id: 'D-403', areaM2: 18.0, volumeM3: 45.0, floor: 4, type: 'Extra Large', price: 349, climate: true, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 6.0, widthM: 3.0, heightM: 2.5 } },
+  { id: 'D-404', areaM2: 18.0, volumeM3: 45.0, floor: 4, type: 'Extra Large', price: 349, climate: true, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 6.0, widthM: 3.0, heightM: 2.5 } },
+  { id: 'X-401', areaM2: 18.0, volumeM3: 45.0, floor: 4, type: 'Extra Large', price: 330, climate: false, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 6.0, widthM: 3.0, heightM: 2.5 } },
+  { id: 'X-402', areaM2: 18.0, volumeM3: 45.0, floor: 4, type: 'Extra Large', price: 330, climate: false, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 6.0, widthM: 3.0, heightM: 2.5 } },
+
 ]
 
 export const MY_RENTALS = [
@@ -47,6 +63,11 @@ export interface TicketItem {
   created: string
   facility: string
   unit: string
+  facilityId?: string
+  relatedType?: 'rental' | 'reservation' | 'general'
+  relatedId?: string
+  updatedAt?: string
+  assignedStaff?: string
   messages: TicketMessage[]
 }
 
