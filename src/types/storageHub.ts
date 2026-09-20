@@ -40,7 +40,7 @@ export type RentalStatus = 'active' | 'return_requested' | 'return_inspection' |
 
 export type PaymentStatus = 'pending' | 'paid' | 'overdue' | 'refunded' | 'cancelled'
 
-export type ReturnStatus = 'requested' | 'scheduled' | 'inspected' | 'awaiting_customer_confirmation' | 'disputed' | 'refund_pending' | 'completed'
+export type ReturnStatus = 'requested' | 'scheduled' | 'inspected' | 'awaiting_customer_confirmation' | 'disputed' | 'payment_due' | 'refund_pending' | 'completed'
 
 export type DamageClassification =
   | 'no_damage'
@@ -163,7 +163,7 @@ export interface PricingQuote {
   expiresAt: string
 }
 
-export interface DiscountRule = {
+export interface DiscountRule {
   code: string
   type: 'PERCENT' | 'FIXED'
   value: number
@@ -214,6 +214,7 @@ export interface StorageReservation {
   customerEmail: string
   customerPhone: string
   customerAddress?: string
+  customerArchivedAt?: string
   identityId: string
   facilityId: string
   facilityName: string
@@ -274,6 +275,7 @@ export interface StorageReservation {
   appointmentDate?: string
   appointmentTime?: string
   generatedAccessPin?: string
+  unitAssignedAt?: string
   checkedInAt?: string
   checkedInBy?: string
   handoverCompleted?: boolean
@@ -370,12 +372,16 @@ export interface StorageContract {
   uploadedAt: string
   uploadedBy: string
   status: 'SIGNED'
+  contractType?: 'INITIAL' | 'RENEWAL'
+  renewalId?: string
+  customerArchivedAt?: string
 }
 
 export interface StoragePayment {
   id: string
   reservationId: string
   rentalId?: string
+  renewalId?: string
   type: 'RESERVATION_DEPOSIT' | 'INITIAL_RENT' | 'RENEWAL' | 'DAMAGE_FEE' | 'REFUND'
   amount: number
   paymentMethod?: 'CASH' | 'BANK_TRANSFER' | 'ONLINE_GATEWAY'
@@ -386,6 +392,9 @@ export interface StoragePayment {
   status: 'PAID' | 'PENDING'
   paidAt?: string
   recordedBy: string
+  invoiceNumber?: string
+  description?: string
+  gatewayVerifiedAt?: string
 }
 
 export interface RenewalRecord {
@@ -399,13 +408,36 @@ export interface RenewalRecord {
   newEndDate: string
   renewalMonths: number
   renewalFee: number
-  status: 'pending' | 'approved' | 'rejected' | 'completed'
+  status: 'pending' | 'approved' | 'deposit_paid' | 'appointment_scheduled' | 'payment_processing' | 'payment_failed' | 'payment_expired' | 'rejected' | 'cancelled' | 'completed'
   requestedAt: string
+  updatedAt?: string
+  cancelledAt?: string
   approvedBy?: string
   approvedAt?: string
+  paymentDueAt?: string
+  invoiceNumber?: string
+  invoiceIssuedAt?: string
   paidAt?: string
   paymentMethod?: string
   transactionReference?: string
+  paymentId?: string
+  addendumNumber?: string
+  addendumIssuedAt?: string
+  renewalContractId?: string
+  renewalContractNumber?: string
+  effectiveAt?: string
+  originalMonthlyRate?: number
+  totalAmount?: number
+  bookingDepositAmount?: number
+  remainingAmount?: number
+  appointmentDate?: string
+  appointmentTime?: string
+  signingDeadline?: string
+  overdueDays?: number
+  lateFeePerDay?: number
+  lateFeeAmount?: number
+  signedAt?: string
+  completedBy?: string
   attachmentUrl?: string
   notes?: string
 }
@@ -461,6 +493,7 @@ export interface RentalRecord {
   accessRevokedAt?: string
   receiptConfirmedAt?: string
   receiptConfirmedBy?: string
+  customerArchivedAt?: string
   // Optional legacy fields for backward-compatibility during refactoring
   size?: number
   sqft?: number
@@ -493,6 +526,10 @@ export interface ReturnCase {
   overdueFee?: number
   depositAmount: number // Security deposit to be refunded from
   netRefundAmount: number
+  amountDueFromCustomer?: number
+  overdueDays?: number
+  settlementPaymentId?: string
+  settlementPaidAt?: string
   staffNotes?: string
   evidence: string[]
   customerConfirmed: boolean
@@ -500,6 +537,7 @@ export interface ReturnCase {
   customerDecision?: 'accepted' | 'disputed'
   customerDecisionNote?: string
   proposedUnitStatus?: 'available' | 'maintenance'
+  inspectedAt?: string
   completedAt?: string
   staffId?: string
   returnedItems?: { key: boolean; card: boolean; lock: boolean }

@@ -1,4 +1,4 @@
-import { type ReactNode, type HTMLAttributes, type InputHTMLAttributes } from 'react'
+import { type ReactNode, type HTMLAttributes, type InputHTMLAttributes, type TdHTMLAttributes } from 'react'
 
 // ─── Badge ───────────────────────────────────────────────────────────────────
 
@@ -59,9 +59,9 @@ export function Button({ variant = 'primary', size = 'md', className = '', child
 
 // ─── Card ────────────────────────────────────────────────────────────────────
 
-export function Card({ children, className = '', onClick }: { children?: ReactNode; className?: string; onClick?: () => void }) {
+export function Card({ children, className = '', ...rest }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`app-card ${className}`} onClick={onClick}>
+    <div className={`app-card ${className}`} {...rest}>
       {children}
     </div>
   )
@@ -118,15 +118,15 @@ export function Th({ children, className = '' }: { children?: ReactNode; classNa
   return <th className={`px-4 py-3 font-mono text-[11px] font-semibold text-stone-500 uppercase tracking-[.06em] ${className}`}>{children}</th>
 }
 
-export function Td({ children, className = '' }: { children?: ReactNode; className?: string }) {
-  return <td className={`px-4 py-3 text-stone-700 ${className}`}>{children}</td>
+export function Td({ children, className = '', ...rest }: TdHTMLAttributes<HTMLTableCellElement>) {
+  return <td className={`px-4 py-3 text-stone-700 ${className}`} {...rest}>{children}</td>
 }
 
-export function Tr({ children, onClick, className = '' }: { children: ReactNode; onClick?: () => void; className?: string }) {
+export function Tr({ children, className = '', ...rest }: HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
-      className={`hover:bg-[#fbfaf6] transition-colors ${onClick ? 'cursor-pointer' : ''} ${className}`}
-      onClick={onClick}
+      className={`hover:bg-[#fbfaf6] transition-colors ${rest.onClick ? 'cursor-pointer' : ''} ${className}`}
+      {...rest}
     >
       {children}
     </tr>

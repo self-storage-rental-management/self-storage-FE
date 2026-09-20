@@ -12,6 +12,15 @@ interface NavItem {
   group?: string
 }
 
+export interface LayoutNotification {
+  id: string
+  title: string
+  message?: string
+  date?: string
+  page: string
+  targetId?: string
+}
+
 function resolveNavPage(navItems: NavItem[], requested: string | null): string | null {
   if (!requested) return null
   if (requested === 'profile') return 'profile'
@@ -57,14 +66,32 @@ interface LayoutProps {
   children: ReactNode
   roleLabel: string
   roleColor: string
+  notifications?: LayoutNotification[]
+  onNotificationClick?: (notification: LayoutNotification) => void
 }
 
 
 export default function Layout({
-  user, navItems, currentPage, onNavigate, onLogout, children, roleLabel
+  user, navItems, currentPage, onNavigate, onLogout, children, roleLabel, notifications: suppliedNotifications, onNotificationClick
 }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationReadKey = `storagehub-opened-notifications-v2-${user.id}`
+  const notificationBadgeKey = `storagehub-seen-notification-badge-v2-${user.id}`
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(notificationReadKey) || '[]')
+    } catch {
+      return []
+    }
+  })
+  const [badgeSeenNotificationIds, setBadgeSeenNotificationIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(notificationBadgeKey) || '[]')
+    } catch {
+      return []
+    }
+  })
   const { lang, t } = useLanguage()
 
   useEffect(() => {
@@ -196,7 +223,41 @@ export default function Layout({
     { page: 'support', vi: 'Yêu cầu hỗ trợ có phản hồi mới', en: 'A support request has a new reply', timeVi: '2 giờ trước', timeEn: '2 hours ago' },
     { page: 'units', vi: 'Trạng thái gian kho vừa được cập nhật', en: 'A storage unit status was updated', timeVi: '3 giờ trước', timeEn: '3 hours ago' },
   ]
-  const notifications = notificationCandidates.filter(item => navItems.some(nav => nav.id === item.page)).slice(0, 3)
+  const fallbackNotifications: LayoutNotification[] = notificationCandidates
+    .filter(item => navItems.some(nav => nav.id === item.page))
+    .slice(0, 3)
+    .map(item => ({
+      id: `${roleLabel}-${item.page}`,
+      title: lang === 'vi' ? item.vi : item.en,
+      message: lang === 'vi' ? item.timeVi : item.timeEn,
+      page: item.page
+    }))
+  const notifications = suppliedNotifications ?? fallbackNotifications
+  const unreadCount = notifications.filter(item => !badgeSeenNotificationIds.includes(item.id)).length
+
+  const formatNotificationDate = (value?: string) => {
+    if (!value) return ''
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')
+  }
+
+  const openNotifications = () => {
+    setNotificationsOpen(open => !open)
+    if (!notificationsOpen && unreadCount > 0) {
+      const nextSeenIds = Array.from(new Set([...badgeSeenNotificationIds, ...notifications.map(item => item.id)]))
+      setBadgeSeenNotificationIds(nextSeenIds)
+      localStorage.setItem(notificationBadgeKey, JSON.stringify(nextSeenIds))
+    }
+  }
+
+  const openNotificationDetail = (notification: LayoutNotification) => {
+    const nextReadIds = Array.from(new Set([...readNotificationIds, notification.id]))
+    setReadNotificationIds(nextReadIds)
+    localStorage.setItem(notificationReadKey, JSON.stringify(nextReadIds))
+    setNotificationsOpen(false)
+    if (onNotificationClick) onNotificationClick(notification)
+    else navigate(notification.page)
+  }
 
   return (
     <div className="flex h-full bg-[#f3f2eb]">
@@ -327,7 +388,7 @@ export default function Layout({
           <div className="relative">
             <button
               type="button"
-              onClick={() => setNotificationsOpen(open => !open)}
+              onClick={openNotifications}
               className={`relative text-stone-400 hover:text-stone-700 transition p-2 rounded-lg hover:bg-stone-100 ${roleLabel === 'Customer' ? 'customer-notification-bell' : ''}`}
               aria-label={lang === 'vi' ? 'Xem thông báo' : 'View notifications'}
               title={lang === 'vi' ? 'Thông báo' : 'Notifications'}
@@ -336,26 +397,37 @@ export default function Layout({
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
-              {notifications.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-[#e9a12c] rounded-full ring-2 ring-white" />}
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex min-w-5 h-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </button>
             {notificationsOpen && (
               <div className="absolute right-0 top-11 z-50 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl">
-                <div className="border-b border-stone-100 px-4 py-3">
+                <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
                   <p className="font-semibold text-stone-900">{lang === 'vi' ? 'Thông báo' : 'Notifications'}</p>
+                  <span className="text-xs text-stone-400">{notifications.length}</span>
                 </div>
-                {notifications.length ? notifications.map(item => (
-                  <button
-                    type="button"
-                    key={item.page}
-                    onClick={() => { navigate(item.page); setNotificationsOpen(false) }}
-                    className="block w-full border-b border-stone-100 px-4 py-3 text-left transition last:border-0 hover:bg-amber-50"
-                  >
-                    <span className="block text-sm font-medium text-stone-800">{lang === 'vi' ? item.vi : item.en}</span>
-                    <span className="mt-1 block text-xs text-stone-400">{lang === 'vi' ? item.timeVi : item.timeEn}</span>
-                  </button>
-                )) : (
-                  <p className="px-4 py-6 text-center text-sm text-stone-500">{lang === 'vi' ? 'Chưa có thông báo mới' : 'No new notifications'}</p>
-                )}
+                <div className="max-h-96 overflow-y-auto">
+                  {notifications.length ? notifications.map(item => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      onClick={() => openNotificationDetail(item)}
+                      className={`block w-full border-b border-stone-100 px-4 py-3 text-left transition last:border-0 hover:bg-amber-100 ${readNotificationIds.includes(item.id) ? 'bg-white' : 'bg-amber-50'}`}
+                    >
+                      <span className="flex items-start gap-2">
+                        {!readNotificationIds.includes(item.id) && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-500" />}
+                        <span className="block text-sm font-medium text-stone-800">{item.title}</span>
+                      </span>
+                      {item.message && <span className="mt-1 block text-xs text-stone-500">{item.message}</span>}
+                      {item.date && <span className="mt-1 block text-[10px] text-stone-400">{formatNotificationDate(item.date)}</span>}
+                    </button>
+                  )) : (
+                    <p className="px-4 py-6 text-center text-sm text-stone-500">{lang === 'vi' ? 'Chưa có thông báo mới' : 'No new notifications'}</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -370,7 +442,7 @@ export default function Layout({
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-7 fade-in">
+        <main data-layout-scroll-container className="flex-1 overflow-y-auto p-4 lg:p-7 fade-in">
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>
 
         </main>
