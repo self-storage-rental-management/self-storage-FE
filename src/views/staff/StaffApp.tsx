@@ -6,7 +6,7 @@ import { useLanguage } from '../../i18n/LanguageContext'
 import type { User } from '../../types'
 import { RESERVATIONS, CHECKINS, RETURNS, SUPPORT_TICKETS, MY_RENTALS, type TicketItem } from "../../data/demoDatabase"
 
-type ReservationStatus = 'CREATED' | 'DEPOSIT_PAID' | 'UNIT_RESERVED' | 'READY_FOR_CHECKIN' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED'
+type ReservationStatus = 'CREATED' | 'REVIEW_REQUIRED' | 'AWAITING_DEPOSIT' | 'DEPOSIT_PAID' | 'UNIT_RESERVED' | 'READY_FOR_CHECKIN' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED'
 type StaffReservation = Omit<(typeof RESERVATIONS)[number], 'status'> & {
   status: ReservationStatus
   appointmentDate: string
@@ -41,7 +41,9 @@ const addDays = (dateLabel: string, days: number) => {
 
 const reservationSeed: StaffReservation[] = RESERVATIONS.map((item, index) => ({
   ...item,
-  status: item.paid ? (item.unit ? 'UNIT_RESERVED' : 'DEPOSIT_PAID') : 'CREATED',
+  // Keep one realistic exception in the Staff queue so the REVIEW_REQUIRED
+  // workflow can be exercised without changing the shared demo data.
+  status: item.id === 'RSV-2049' ? 'REVIEW_REQUIRED' : item.paid ? (item.unit ? 'UNIT_RESERVED' : 'DEPOSIT_PAID') : 'CREATED',
   appointmentDate: item.moveIn,
   appointmentTime: index === 0 ? '11:00 AM' : '09:00 AM',
   checkInDeadline: addDays(item.moveIn, 14),
@@ -108,6 +110,8 @@ const statusLabelMap: Record<string, Record<string, string>> = {
     resolved: 'Đã giải quyết',
     closed: 'Đã đóng',
     CREATED: 'Chờ thanh toán cọc',
+    REVIEW_REQUIRED: 'Cần Staff rà soát ngoại lệ',
+    AWAITING_DEPOSIT: 'Đã duyệt · Chờ thanh toán cọc',
     DEPOSIT_PAID: 'Đã cọc · Chờ phân kho',
     UNIT_RESERVED: 'Đã phân kho',
     READY_FOR_CHECKIN: 'Sẵn sàng Check-in',
@@ -134,6 +138,8 @@ const statusLabelMap: Record<string, Record<string, string>> = {
     resolved: 'Resolved',
     closed: 'Closed',
     CREATED: 'Awaiting Deposit',
+    REVIEW_REQUIRED: 'Review Required',
+    AWAITING_DEPOSIT: 'Approved · Awaiting Deposit',
     DEPOSIT_PAID: 'Deposit Paid · Awaiting Unit',
     UNIT_RESERVED: 'Unit Reserved',
     READY_FOR_CHECKIN: 'Ready for Check-in',
@@ -161,7 +167,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
   ]
 
   const [page, setPage] = useState(() => getInitialPage(NAV, 'dashboard'))
-  const [reservations] = useState<StaffReservation[]>(reservationSeed)
+  const [reservations, setReservations] = useState<StaffReservation[]>(reservationSeed)
   const [checkins, setCheckins] = useState<StaffCheckin[]>(checkinSeed)
   const [returns, setReturns] = useState<StaffReturn[]>(returnSeed)
   const [inspectModal, setInspectModal] = useState(false)
@@ -169,6 +175,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
   const [reservationModal, setReservationModal] = useState(false)
   const [selectedReservation, setSelectedReservation] = useState<StaffReservation | null>(null)
   const [selectedReturn, setSelectedReturn] = useState<StaffReturn | null>(null)
+  const [returnDetailsOnly, setReturnDetailsOnly] = useState(false)
   const [selectedCheckin, setSelectedCheckin] = useState<StaffCheckin | null>(null)
   const [ticketTab, setTicketTab] = useState('Open')
   const [reservationSearch, setReservationSearch] = useState('')
@@ -270,6 +277,21 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
     const reservation = reservations.find(item => item.id === checkin.reservationId)
     return !reservation || (reservation.status !== 'CANCELLED' && reservation.status !== 'EXPIRED')
   })
+  const openCheckinRecord = (checkin: StaffCheckin) => {
+    setSelectedCheckin(checkin)
+    setCheckinChecks({ identity: false, reservation: false, contract: false, payment: checkin.status !== 'pending-payment', measurement: false, walkthrough: false, condition: false, credential: false })
+    setActualDimensions(checkin.dimensionsCm)
+    setActualWeight(String(checkin.weightKg))
+    setActualMaterial(checkin.material)
+    setActualCondition(checkin.initialCondition)
+    setCheckinEvidence('')
+    setCheckinNotes('')
+    setContractFile('')
+    setPaymentReference('')
+    setPaymentEvidence('')
+    setScheduleOverrideReason('')
+    setCheckinModal(true)
+  }
   const operationalTasks = [
     ...reservations.filter(r => r.status === 'DEPOSIT_PAID').map(r => ({ id: `allocation-${r.id}`, title: lang === 'vi' ? `Theo dõi Manager phân kho ${r.id}` : `Track unit allocation ${r.id}`, customer: r.customer, time: `${r.appointmentDate} ${r.appointmentTime}`, sla: lang === 'vi' ? 'Chờ Manager phân kho' : 'Awaiting manager allocation', priority: 'medium', page: 'reservations' })),
     ...eligibleCheckins.filter(c => c.status !== 'completed' && c.status !== 'no-show').map(c => ({ id: `checkin-${c.id}`, title: lang === 'vi' ? `Check-in & bàn giao ${c.unit}` : `Check-in & handover ${c.unit}`, customer: c.customer, time: `${c.appointmentDate} ${c.appointmentTime}`, sla: c.scheduleChanged ? (lang === 'vi' ? 'Lịch đã thay đổi' : 'Schedule changed') : (lang === 'vi' ? `Hạn ${c.checkInDeadline}` : `Deadline ${c.checkInDeadline}`), priority: c.scheduleChanged ? 'high' : 'medium', page: 'checkin' })),
@@ -277,8 +299,37 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
     ...facilityTickets.filter(ticket => ticket.status !== 'resolved').map(ticket => ({ id: `support-${ticket.id}`, title: lang === 'vi' ? `Xử lý hỗ trợ ${ticket.id}` : `Handle support ${ticket.id}`, customer: ticket.customer, time: ticket.created, sla: ticket.status === 'waiting-customer' ? (lang === 'vi' ? 'Chờ Customer phản hồi' : 'Waiting for customer') : ticket.priority === 'high' ? (lang === 'vi' ? 'Xử lý ngay' : 'Immediate') : (lang === 'vi' ? 'Trong ca' : 'Within shift'), priority: ticket.priority, page: 'support' })),
     ...expiringRentals.map(rental => ({ id: `expiry-${rental.id}`, title: lang === 'vi' ? `Hợp đồng ${rental.unit} sắp hết hạn` : `Lease ${rental.unit} expiring`, customer: lang === 'vi' ? 'Khách thuê hiện tại' : 'Current tenant', time: rental.nextDue, sla: lang === 'vi' ? 'Theo dõi nhắc gia hạn' : 'Track renewal reminder', priority: 'low', page: 'tasks' }))
   ].sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority])
+  const openOperationalTask = (task: (typeof operationalTasks)[number]) => {
+    if (task.id.startsWith('allocation-')) {
+      const reservation = reservations.find(item => item.id === task.id.replace('allocation-', ''))
+      if (reservation) { setSelectedReservation(reservation); setReservationModal(true) }
+      return
+    }
+    if (task.id.startsWith('checkin-')) {
+      const checkin = checkins.find(item => item.id === task.id.replace('checkin-', ''))
+      if (checkin) { setPage('checkin'); openCheckinRecord(checkin) }
+      return
+    }
+    if (task.id.startsWith('support-')) {
+      const ticket = staffTickets.find(item => item.id === task.id.replace('support-', ''))
+      if (ticket) {
+        setSelectedStaffTicket(ticket)
+        setTicketNewStatus(ticket.status)
+        setTicketEvidence('')
+        setTicketEscalated(false)
+        setTicketEscalationReason('')
+        setPage('support')
+        setRespondModal(true)
+      }
+      return
+    }
+    setPage(task.page)
+    if (task.id.startsWith('return-')) showToast(lang === 'vi' ? `Đã mở danh sách hồ sơ trả kho cho ${task.customer}.` : `Opened the return records for ${task.customer}.`)
+    if (task.id.startsWith('expiry-')) showToast(lang === 'vi' ? `Đã mở nhiệm vụ theo dõi gia hạn cho ${task.customer}.` : `Opened the renewal follow-up task for ${task.customer}.`)
+  }
   const totalCount = operationalTasks.length
   const completedCount = reservations.filter(r => r.status === 'COMPLETED').length + checkins.filter(c => c.status === 'completed').length + returns.filter(r => r.status === 'waiting-customer' || r.status === 'refunded').length + facilityTickets.filter(ticket => ticket.status === 'resolved').length
+  const remainingTaskCount = Math.max(0, totalCount - completedCount)
 
 
   return (
@@ -302,7 +353,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
           <Card>
             <div className="p-4 border-b border-stone-200 flex items-center justify-between gap-3"><div><h3 className="font-bold">{lang === 'vi' ? 'Việc ưu tiên theo lịch vận hành' : 'Priority Operational Tasks'}</h3><p className="text-xs text-stone-500">{lang === 'vi' ? 'Lịch nhận/trả kho, hỗ trợ và hợp đồng sắp hết hạn.' : 'Check-ins, returns, support and expiring leases.'}</p></div><Button variant="outline" size="sm" onClick={() => setPage('tasks')}>{lang === 'vi' ? 'Xem toàn bộ' : 'View all'}</Button></div>
             <Table><Thead><tr><Th>{lang === 'vi' ? 'Ưu tiên' : 'Priority'}</Th><Th>{lang === 'vi' ? 'Nhiệm vụ' : 'Task'}</Th><Th>{lang === 'vi' ? 'Khách hàng' : 'Customer'}</Th><Th>{lang === 'vi' ? 'Lịch / SLA' : 'Schedule / SLA'}</Th><Th></Th></tr></Thead><Tbody>
-              {operationalTasks.slice(0, 6).map(task => <Tr key={task.id}><Td>{s(task.priority, { high: 'error', medium: 'warning', low: 'muted' })}</Td><Td><b>{task.title}</b><p className="text-[11px] text-stone-400">{task.id}</p></Td><Td>{task.customer}</Td><Td><p className="text-xs">{task.time}</p><p className="text-[11px] font-semibold text-amber-700">{task.sla}</p></Td><Td className="text-right"><Button size="sm" variant="outline" onClick={() => setPage(task.page)}>{lang === 'vi' ? 'Xử lý' : 'Open'}</Button></Td></Tr>)}
+              {operationalTasks.slice(0, 6).map(task => <Tr key={task.id}><Td>{s(task.priority, { high: 'error', medium: 'warning', low: 'muted' })}</Td><Td><b>{task.title}</b><p className="text-[11px] text-stone-400">{task.id}</p></Td><Td>{task.customer}</Td><Td><p className="text-xs">{task.time}</p><p className="text-[11px] font-semibold text-amber-700">{task.sla}</p></Td><Td className="text-right"><Button size="sm" variant="outline" onClick={() => openOperationalTask(task)}>{lang === 'vi' ? 'Xử lý' : 'Open'}</Button></Td></Tr>)}
             </Tbody></Table>
           </Card>
         </div>
@@ -320,11 +371,11 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <StatCard title={t('tasks.total', 'Total Tasks')} value={totalCount} icon={Icon.tasks} iconBg="bg-blue-50" />
             <StatCard title={t('tasks.completed', 'Completed')} value={completedCount} icon={Icon.check} iconBg="bg-green-50" />
-            <StatCard title={t('tasks.remaining', 'Remaining')} value={Math.max(0, totalCount)} icon={Icon.alert} iconBg="bg-amber-50" />
+            <StatCard title={t('tasks.remaining', 'Remaining')} value={remainingTaskCount} icon={Icon.alert} iconBg="bg-amber-50" />
           </div>
 
           <Card><Table><Thead><tr><Th>{lang === 'vi' ? 'Nhiệm vụ được giao' : 'Assigned Task'}</Th><Th>{lang === 'vi' ? 'Khách hàng' : 'Customer'}</Th><Th>{lang === 'vi' ? 'Lịch' : 'Schedule'}</Th><Th>SLA</Th><Th>{lang === 'vi' ? 'Ưu tiên' : 'Priority'}</Th><Th></Th></tr></Thead><Tbody>
-            {operationalTasks.map(task => <Tr key={task.id}><Td><b>{task.title}</b></Td><Td>{task.customer}</Td><Td className="text-xs">{task.time}</Td><Td className="text-xs font-semibold text-amber-700">{task.sla}</Td><Td>{s(task.priority, { high: 'error', medium: 'warning', low: 'muted' })}</Td><Td className="text-right"><Button size="sm" variant="outline" onClick={() => setPage(task.page)}>{lang === 'vi' ? 'Mở hồ sơ' : 'Open record'}</Button></Td></Tr>)}
+            {operationalTasks.map(task => <Tr key={task.id}><Td><b>{task.title}</b></Td><Td>{task.customer}</Td><Td className="text-xs">{task.time}</Td><Td className="text-xs font-semibold text-amber-700">{task.sla}</Td><Td>{s(task.priority, { high: 'error', medium: 'warning', low: 'muted' })}</Td><Td className="text-right"><Button size="sm" variant="outline" onClick={() => openOperationalTask(task)}>{lang === 'vi' ? 'Mở hồ sơ' : 'Open record'}</Button></Td></Tr>)}
           </Tbody></Table></Card>
         </div>
       )}
@@ -336,7 +387,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
             title={lang === 'vi' ? 'Theo Dõi Đơn Đặt Giữ Kho' : 'Reservation Tracking'}
             subtitle={lang === 'vi' ? 'Staff chỉ theo dõi trạng thái và chuẩn bị Check-in; đơn hợp lệ không cần Staff phê duyệt.' : 'Staff monitors progress and prepares check-in; valid reservations require no staff approval.'}
           />
-          <Card className="p-4 mb-4"><div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-3"><Input label={lang === 'vi' ? 'Tìm hồ sơ' : 'Search records'} value={reservationSearch} onChange={event => setReservationSearch(event.target.value)} placeholder={lang === 'vi' ? 'Mã đơn, tên, SĐT, email, CCCD, cơ sở, mã kho' : 'Code, name, phone, email, ID, facility, unit'} /><div><label className="text-sm font-medium text-stone-700">{lang === 'vi' ? 'Trạng thái chuẩn' : 'Canonical status'}</label><select value={reservationStatus} onChange={event => setReservationStatus(event.target.value)} className="mt-1 w-full border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="all">{lang === 'vi' ? 'Tất cả' : 'All'}</option>{(['CREATED', 'DEPOSIT_PAID', 'UNIT_RESERVED', 'READY_FOR_CHECKIN', 'COMPLETED', 'CANCELLED', 'EXPIRED'] as ReservationStatus[]).map(status => <option key={status} value={status}>{statusLabelMap[lang][status]}</option>)}</select></div></div><p className="mt-2 text-xs text-stone-500">{filteredReservations.length}/{reservations.length} {lang === 'vi' ? 'hồ sơ phù hợp' : 'matching records'}</p></Card>
+          <Card className="p-4 mb-4"><div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-3"><Input label={lang === 'vi' ? 'Tìm hồ sơ' : 'Search records'} value={reservationSearch} onChange={event => setReservationSearch(event.target.value)} placeholder={lang === 'vi' ? 'Mã đơn, tên, SĐT, email, CCCD, cơ sở, mã kho' : 'Code, name, phone, email, ID, facility, unit'} /><div><label className="text-sm font-medium text-stone-700">{lang === 'vi' ? 'Trạng thái chuẩn' : 'Canonical status'}</label><select value={reservationStatus} onChange={event => setReservationStatus(event.target.value)} className="mt-1 w-full border border-stone-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="all">{lang === 'vi' ? 'Tất cả' : 'All'}</option>{(['CREATED', 'REVIEW_REQUIRED', 'AWAITING_DEPOSIT', 'DEPOSIT_PAID', 'UNIT_RESERVED', 'READY_FOR_CHECKIN', 'COMPLETED', 'CANCELLED', 'EXPIRED'] as ReservationStatus[]).map(status => <option key={status} value={status}>{statusLabelMap[lang][status]}</option>)}</select></div></div><p className="mt-2 text-xs text-stone-500">{filteredReservations.length}/{reservations.length} {lang === 'vi' ? 'hồ sơ phù hợp' : 'matching records'}</p></Card>
           <Card>
             <Table>
               <Thead>
@@ -369,11 +420,13 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                     </Td>
                     <Td><p>{r.appointmentDate} · {r.appointmentTime}</p><p className="text-[11px] text-stone-500">{lang === 'vi' ? 'Hạn cuối' : 'Deadline'}: {r.checkInDeadline}</p>{r.previousAppointment && <p className="text-[11px] text-amber-700">{lang === 'vi' ? 'Lịch cũ' : 'Previous'}: {r.previousAppointment}</p>}</Td>
                     <Td>{r.paid ? <Badge variant="success">{t('reservations.paid', 'Paid')}</Badge> : <Badge variant="error">{t('reservations.unpaid', 'Unpaid')}</Badge>}</Td>
-                    <Td>{s(r.status, { CREATED: 'warning', DEPOSIT_PAID: 'info', UNIT_RESERVED: 'info', READY_FOR_CHECKIN: 'success', COMPLETED: 'success', CANCELLED: 'muted', EXPIRED: 'error' })}</Td>
+                    <Td>{s(r.status, { CREATED: 'warning', REVIEW_REQUIRED: 'error', AWAITING_DEPOSIT: 'warning', DEPOSIT_PAID: 'info', UNIT_RESERVED: 'info', READY_FOR_CHECKIN: 'success', COMPLETED: 'success', CANCELLED: 'muted', EXPIRED: 'error' })}</Td>
                     <Td>
                       <div className="flex gap-1.5">
                         <Button variant="outline" size="sm" onClick={() => { setSelectedReservation(r); setReservationModal(true) }}>{t('reservations.view', 'View')}</Button>
-                        {r.status === 'CREATED' && <Badge variant="warning">{lang === 'vi' ? 'Chỉ theo dõi · chờ cọc' : 'Monitor only'}</Badge>}
+                        {r.status === 'REVIEW_REQUIRED' && <Button variant="primary" size="sm" onClick={() => { setSelectedReservation(r); setReservationModal(true) }}>{lang === 'vi' ? 'Rà soát ngoại lệ' : 'Review exception'}</Button>}
+                        {r.status === 'CREATED' && <Badge variant="warning">{lang === 'vi' ? 'Theo dõi · chờ cọc' : 'Monitor only'}</Badge>}
+                        {r.status === 'AWAITING_DEPOSIT' && <Badge variant="warning">{lang === 'vi' ? 'Chờ Customer thanh toán' : 'Awaiting customer deposit'}</Badge>}
                         {r.status === 'DEPOSIT_PAID' && <Badge variant="info">{lang === 'vi' ? 'Manager đang phân kho' : 'Manager allocation'}</Badge>}
                       </div>
                     </Td>
@@ -418,26 +471,12 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                   <div className="flex items-center gap-3">
                     {s(c.status, { scheduled: 'info', 'pending-payment': 'warning', completed: 'success', 'no-show': 'error' })}
                     {c.status !== 'completed' && (
-                      <Button variant="primary" size="sm" onClick={() => {
-                        setSelectedCheckin(c)
-                        setCheckinChecks({ identity: false, reservation: false, contract: false, payment: c.status !== 'pending-payment', measurement: false, walkthrough: false, condition: false, credential: false })
-                        setActualDimensions(c.dimensionsCm)
-                        setActualWeight(String(c.weightKg))
-                        setActualMaterial(c.material)
-                        setActualCondition(c.initialCondition)
-                        setCheckinEvidence('')
-                        setCheckinNotes('')
-                        setContractFile('')
-                        setPaymentReference('')
-                        setPaymentEvidence('')
-                        setScheduleOverrideReason('')
-                        setCheckinModal(true)
-                      }}>
+                      <Button variant="primary" size="sm" onClick={() => openCheckinRecord(c)}>
                         {t('checkin.process', 'Process Check-in')}
                       </Button>
                     )}
                     {c.status !== 'completed' && <Button variant="danger" size="sm" disabled={!canMarkNoShow} onClick={() => { setNoShowTarget(c); setNoShowReason('') }}>{lang === 'vi' ? 'Đánh dấu No-show' : 'Mark No-show'}</Button>}
-                    {c.status === 'completed' && <Button variant="ghost" size="sm">{t('checkin.viewRecord', 'View Record')}</Button>}
+                    {c.status === 'completed' && <Button variant="ghost" size="sm" onClick={() => showToast(lang === 'vi' ? `Hồ sơ ${c.id}: đã kích hoạt rental, đã lưu bằng chứng và đang chờ Customer xác nhận.` : `${c.id}: rental activated, evidence saved, awaiting customer confirmation.`)}>{t('checkin.viewRecord', 'View Record')}</Button>}
                   </div>
                 </div>
               </Card>
@@ -492,11 +531,11 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                     <Td>
                       {r.status === 'pending' && !scheduledReturnIds.has(r.id) && <Button variant="primary" size="sm" onClick={() => { setScheduledReturnIds(previous => new Set(previous).add(r.id)); showToast(lang === 'vi' ? 'Đã xác nhận lịch kiểm tra trả kho.' : 'Return inspection schedule confirmed.') }}>{lang === 'vi' ? 'Xác nhận lịch' : 'Confirm schedule'}</Button>}
                       {r.status === 'pending' && scheduledReturnIds.has(r.id) && (
-                        <Button variant="primary" size="sm" onClick={() => { setSelectedReturn(r); setReturnInventory('match'); setReturnClassification('no-damage'); setReturnEvidence(''); setReturnNotes(r.finalCondition); setReturnActualPackages(String(r.packageCount)); setReturnKeys('Đã thu hồi đủ PIN/thẻ/chìa khóa'); setReturnDamageFee('0'); setReturnCleaningFee('0'); setReturnLostItemFee('0'); setReturnOverdueFee('0'); setReturnOtherDebt('0'); setInspectModal(true) }}>
+                        <Button variant="primary" size="sm" onClick={() => { setSelectedReturn(r); setReturnDetailsOnly(false); setReturnInventory('match'); setReturnClassification('no-damage'); setReturnEvidence(''); setReturnNotes(r.finalCondition); setReturnActualPackages(String(r.packageCount)); setReturnKeys('Đã thu hồi đủ PIN/thẻ/chìa khóa'); setReturnDamageFee('0'); setReturnCleaningFee('0'); setReturnLostItemFee('0'); setReturnOverdueFee('0'); setReturnOtherDebt('0'); setInspectModal(true) }}>
                           {t('return.action.inspect', 'Inspect')}
                         </Button>
                       )}
-                      {r.status !== 'pending' && <Button variant="ghost" size="sm">{t('return.action.details', 'Details')}</Button>}
+                      {r.status !== 'pending' && <Button variant="ghost" size="sm" onClick={() => { setSelectedReturn(r); setReturnDetailsOnly(true); setReturnInventory('match'); setReturnClassification(r.classification === 'Chờ phân loại' ? 'no-damage' : r.classification); setReturnEvidence(r.evidence[r.evidence.length - 1] ?? ''); setReturnNotes(r.finalCondition); setReturnActualPackages(String(r.packageCount)); setReturnKeys('Đã thu hồi đủ PIN/thẻ/chìa khóa'); setInspectModal(true) }}>{t('return.action.details', 'Details')}</Button>}
                     </Td>
                   </Tr>
                 ))}
@@ -662,6 +701,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
               <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">CCCD</p><b>{selectedReservation.identityId}</b><p className="text-xs">Đối chiếu bản gốc khi check-in</p></div>
             </div>
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span><b>{lang === 'vi' ? 'Trạng thái chuẩn' : 'Canonical status'}:</b> {statusLabelMap[lang][selectedReservation.status]}</span><span><b>{lang === 'vi' ? 'Lịch Check-in' : 'Check-in'}:</b> {selectedReservation.appointmentDate} · {selectedReservation.appointmentTime}</span><span><b>{lang === 'vi' ? 'Hạn cuối' : 'Deadline'}:</b> {selectedReservation.checkInDeadline}</span></div><p className="mt-2 text-xs text-blue-800">{lang === 'vi' ? 'Staff không phê duyệt đơn hợp lệ. CREATED chỉ theo dõi thanh toán; DEPOSIT_PAID chờ Manager phân kho.' : 'Staff does not approve valid reservations. CREATED is monitored for payment; DEPOSIT_PAID awaits manager allocation.'}</p></div>
+            {selectedReservation.status === 'REVIEW_REQUIRED' && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900"><p className="font-semibold">{lang === 'vi' ? 'Ngoại lệ cần rà soát' : 'Review-required exception'}</p><p className="mt-1">{lang === 'vi' ? 'Email Customer chưa xác nhận và hồ sơ chưa đủ điều kiện thanh toán cọc. Staff phải kiểm tra thông tin, hàng khai báo và lý do ngoại lệ trước khi quyết định.' : 'Customer email is not verified and the reservation is not ready for deposit. Staff must review the customer, declared goods and exception reason before deciding.'}</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="primary" size="sm" onClick={() => { const updated = { ...selectedReservation, status: 'AWAITING_DEPOSIT' as ReservationStatus }; setReservations(items => items.map(item => item.id === updated.id ? updated : item)); setSelectedReservation(updated); showToast(lang === 'vi' ? 'Đã duyệt ngoại lệ; hồ sơ chuyển sang chờ Customer thanh toán cọc.' : 'Exception approved; reservation is awaiting the customer deposit.') }}>{lang === 'vi' ? 'Duyệt → chờ cọc' : 'Approve → Awaiting Deposit'}</Button><Button variant="danger" size="sm" onClick={() => { const updated = { ...selectedReservation, status: 'CANCELLED' as ReservationStatus }; setReservations(items => items.map(item => item.id === updated.id ? updated : item)); setSelectedReservation(updated); showToast(lang === 'vi' ? 'Đã từ chối ngoại lệ và hủy hồ sơ.' : 'Exception rejected and reservation cancelled.') }}>{lang === 'vi' ? 'Từ chối' : 'Reject'}</Button></div></div>}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div><p className="text-xs text-slate-500">Loại hàng</p><b>{selectedReservation.goodsType}</b></div>
               <div><p className="text-xs text-slate-500">Chất liệu</p><b>{selectedReservation.material}</b></div>
@@ -705,12 +745,12 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-sm font-medium">{lang === 'vi' ? 'Kết quả kiểm kê' : 'Inventory result'}</label><select value={returnInventory} onChange={event => setReturnInventory(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="match">{lang === 'vi' ? 'Khớp khai báo' : 'Matches declaration'}</option><option value="missing">{lang === 'vi' ? 'Thiếu / đã lấy ra' : 'Missing / removed'}</option><option value="damaged">{lang === 'vi' ? 'Có hàng hư hỏng' : 'Damaged goods'}</option><option value="abandoned">{lang === 'vi' ? 'Có hàng bỏ lại' : 'Abandoned goods'}</option></select></div>
-              <div><label className="text-sm font-medium">{lang === 'vi' ? 'Phân loại hiện trạng' : 'Condition classification'}</label><select value={returnClassification} onChange={event => setReturnClassification(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="no-damage">{lang === 'vi' ? 'Không hư hại' : 'No Damage'}</option><option value="minor-damage">{lang === 'vi' ? 'Hư hại nhẹ' : 'Minor Damage'}</option><option value="major-damage">{lang === 'vi' ? 'Hư hại nặng' : 'Major Damage'}</option><option value="requires-maintenance">{lang === 'vi' ? 'Cần bảo trì' : 'Requires Maintenance'}</option></select></div>
+              <div><label className="text-sm font-medium">{lang === 'vi' ? 'Kết quả kiểm kê' : 'Inventory result'}</label><select disabled={returnDetailsOnly} value={returnInventory} onChange={event => setReturnInventory(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="match">{lang === 'vi' ? 'Khớp khai báo' : 'Matches declaration'}</option><option value="missing">{lang === 'vi' ? 'Thiếu / đã lấy ra' : 'Missing / removed'}</option><option value="damaged">{lang === 'vi' ? 'Có hàng hư hỏng' : 'Damaged goods'}</option><option value="abandoned">{lang === 'vi' ? 'Có hàng bỏ lại' : 'Abandoned goods'}</option></select></div>
+              <div><label className="text-sm font-medium">{lang === 'vi' ? 'Phân loại hiện trạng' : 'Condition classification'}</label><select disabled={returnDetailsOnly} value={returnClassification} onChange={event => setReturnClassification(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="no-damage">{lang === 'vi' ? 'Không hư hại' : 'No Damage'}</option><option value="minor-damage">{lang === 'vi' ? 'Hư hại nhẹ' : 'Minor Damage'}</option><option value="major-damage">{lang === 'vi' ? 'Hư hại nặng' : 'Major Damage'}</option><option value="requires-maintenance">{lang === 'vi' ? 'Cần bảo trì' : 'Requires Maintenance'}</option></select></div>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Input label={lang === 'vi' ? 'Số kiện thực tế lúc trả' : 'Actual returned packages'} type="number" value={returnActualPackages} onChange={event => setReturnActualPackages(event.target.value)} /><Input label={lang === 'vi' ? 'PIN/thẻ/chìa khóa thu hồi' : 'Returned PIN/card/keys'} value={returnKeys} onChange={event => setReturnKeys(event.target.value)} /></div>
             <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900"><b>{lang === 'vi' ? 'Bằng chứng bàn giao ban đầu (bất biến)' : 'Immutable initial handover evidence'}:</b> {selectedReturn.evidence.join(' · ')}</div>
-            <Input label={lang === 'vi' ? 'Ảnh/bằng chứng trả kho mới (mã tệp hoặc đường dẫn)' : 'New return evidence (file reference or URL)'} value={returnEvidence} onChange={event => setReturnEvidence(event.target.value)} />
+            <Input disabled={returnDetailsOnly} label={lang === 'vi' ? 'Ảnh/bằng chứng trả kho mới (mã tệp hoặc đường dẫn)' : 'New return evidence (file reference or URL)'} value={returnEvidence} onChange={event => setReturnEvidence(event.target.value)} />
             <div className="rounded-lg border border-stone-200 p-3"><p className="mb-3 text-sm font-semibold">{lang === 'vi' ? 'Các khoản khấu trừ đề xuất' : 'Proposed deductions'}</p><div className="grid grid-cols-2 gap-3 lg:grid-cols-5"><Input label={lang === 'vi' ? 'Hư hại' : 'Damage'} type="number" value={returnDamageFee} onChange={event => setReturnDamageFee(event.target.value)} /><Input label={lang === 'vi' ? 'Vệ sinh' : 'Cleaning'} type="number" value={returnCleaningFee} onChange={event => setReturnCleaningFee(event.target.value)} /><Input label={lang === 'vi' ? 'Thất lạc' : 'Lost items'} type="number" value={returnLostItemFee} onChange={event => setReturnLostItemFee(event.target.value)} /><Input label={lang === 'vi' ? 'Quá hạn' : 'Overdue'} type="number" value={returnOverdueFee} onChange={event => setReturnOverdueFee(event.target.value)} /><Input label={lang === 'vi' ? 'Công nợ khác' : 'Other debt'} type="number" value={returnOtherDebt} onChange={event => setReturnOtherDebt(event.target.value)} /></div><div className="mt-3 flex flex-wrap justify-between gap-2 rounded bg-slate-50 p-3 text-sm"><span>{lang === 'vi' ? 'Tổng khấu trừ' : 'Total deductions'}: <b>${returnTotalDeductions.toFixed(2)}</b></span><span>{lang === 'vi' ? 'Tiền cọc hoàn lại đề xuất' : 'Proposed refund'}: <b className="text-emerald-700">${returnRefund.toFixed(2)}</b></span></div></div>
             <div className="space-y-1">
               <label className="text-sm font-medium text-slate-700">
@@ -718,6 +758,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
               </label>
               <textarea
                 rows={3}
+                disabled={returnDetailsOnly}
                 value={returnNotes}
                 onChange={event => setReturnNotes(event.target.value)}
                 placeholder={lang === 'vi' ? 'Ghi rõ chi tiết hư hại, đồ còn sót lại hoặc vết bẩn...' : 'Document any damage or issues...'}
@@ -727,8 +768,8 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
 
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{lang === 'vi' ? 'Sau khi Staff gửi, hồ sơ chuyển sang “Chờ Customer xác nhận”. Staff không đóng hồ sơ hoặc hoàn cọc thay Customer.' : 'After submission, the record moves to “Waiting for Customer”. Staff cannot close the record or refund the deposit for the customer.'}</div>
             <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={() => setInspectModal(false)}>{t('btn.cancel', 'Cancel')}</Button>
-              <Button
+              <Button variant="outline" onClick={() => setInspectModal(false)}>{returnDetailsOnly ? (lang === 'vi' ? 'Đóng' : 'Close') : t('btn.cancel', 'Cancel')}</Button>
+              {!returnDetailsOnly && <Button
                 variant="primary"
                 disabled={!returnEvidence.trim() || !returnNotes.trim() || !returnKeys.trim() || Number(returnActualPackages) < 0}
                 onClick={() => {
@@ -738,7 +779,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                 }}
               >
                 {t('return.submit', 'Submit Inspection')}
-              </Button>
+              </Button>}
             </div>
           </div>
         )}
@@ -780,7 +821,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                 ['walkthrough', lang === 'vi' ? 'Đã walkthrough gian kho với Customer' : 'Unit walkthrough completed with Customer'],
                 ['condition', lang === 'vi' ? 'Đã kiểm tra tường, sàn, cửa, khóa, đèn, vệ sinh và hư hại sẵn có' : 'Walls, floor, door, lock, lighting, cleanliness and existing damage checked'],
                 ['credential', lang === 'vi' ? `Đã cấp PIN/thẻ/chìa khóa cho kho ${selectedCheckin.unit}` : `PIN/card/key issued for unit ${selectedCheckin.unit}`]
-              ] as Array<[string, string]>).map(([key, label]) => <label key={key} className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={Boolean(checkinChecks[key])} onChange={event => setCheckinChecks(previous => ({ ...previous, [key]: event.target.checked }))} className="w-4 h-4 accent-blue-600" /><span className="text-sm text-slate-700">{label}</span></label>)}
+              ] as Array<[string, string]>).map(([key, label]) => <label key={key} className="flex items-start gap-3 cursor-pointer text-left"><input type="checkbox" checked={Boolean(checkinChecks[key])} onChange={event => setCheckinChecks(previous => ({ ...previous, [key]: event.target.checked }))} className="!w-4 !h-4 flex-none shrink-0 mt-0.5 accent-blue-600" /><span className="min-w-0 flex-1 text-left text-sm leading-5 text-slate-700">{label}</span></label>)}
             </div>
             <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-xs"><b>{lang === 'vi' ? 'Thông tin credential' : 'Credential record'}:</b> {`PIN-${selectedCheckin.id}`} · {selectedCheckin.unit} · {selectedCheckin.customer} · {user.name} · {lang === 'vi' ? 'kích hoạt khi hoàn tất check-in' : 'activates on check-in completion'}</div>
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">{lang === 'vi' ? 'Staff hoàn tất Check-in để kích hoạt rental. Customer sẽ tự bấm “Tôi đã nhận kho”; trước thời điểm đó hồ sơ mang nhãn “Chờ khách xác nhận bàn giao”.' : 'Staff completes check-in to activate the rental. Customer confirms receipt separately; until then the record remains “Awaiting customer handover confirmation”.'}</div>
@@ -792,6 +833,7 @@ export default function StaffApp({ user, onLogout }: { user: User; onLogout: () 
                 disabled={!checkinCanComplete}
                 onClick={() => {
                   setCheckins(items => items.map(item => item.id === selectedCheckin.id ? { ...item, status: 'completed', customerHandoverStatus: 'pending', dimensionsCm: actualDimensions.trim(), weightKg: Number(actualWeight), material: actualMaterial.trim(), initialCondition: actualCondition.trim(), evidence: [...item.evidence, checkinEvidence.trim(), contractFile.trim(), paymentEvidence.trim(), `RECEIPT-${Date.now()} · ${paymentReference.trim()} · ${user.name} thu phần còn lại`, `CHECKIN-${Date.now()} · ${user.name} xác nhận đối chiếu, cấp credential và bàn giao${scheduleOverrideReason.trim() ? ` · Override: ${scheduleOverrideReason.trim()}` : ''}${checkinNotes.trim() ? ` · ${checkinNotes.trim()}` : ''}`] } : item))
+                  setReservations(items => items.map(item => item.id === selectedCheckin.reservationId ? { ...item, status: 'COMPLETED' } : item))
                   setCheckinModal(false)
                   showToast(lang === 'vi' ? 'Đã kích hoạt rental; đang chờ Customer tự xác nhận đã nhận kho.' : 'Rental activated; awaiting the customer’s own handover confirmation.')
                 }}
