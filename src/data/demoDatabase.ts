@@ -2,30 +2,32 @@
 
 export const FACILITIES = [
   { id: 'fac-001', name: 'Downtown Storage', address: '125 Nguyen Hue, District 1', city: 'Ho Chi Minh City', rating: 4.8, available: 18, price: '$89', climate: true, security: '24/7', image: 'photo-1553413077-190dd305871c', units: 120, occupied: 96, revenue: 18450, growth: 8.4, manager: 'Demo Manager', status: 'active' },
-  { id: 'fac-002', name: 'Riverside Storage', address: '42 Bach Dang, Binh Thanh', city: 'Ho Chi Minh City', rating: 4.6, available: 9, price: '$75', climate: false, security: '24/7', image: 'photo-1586864387967-d02ef85d93e8', units: 80, occupied: 61, revenue: 10890, growth: 5.1, manager: 'Mai Tran', status: 'active' },
+  { id: 'fac-002', name: 'Riverside Storage', address: '42 Dai Lo Binh Duong, Thu Dau Mot', city: 'Binh Duong', rating: 4.6, available: 9, price: '$75', climate: false, security: '24/7', image: 'photo-1586864387967-d02ef85d93e8', units: 80, occupied: 61, revenue: 10890, growth: 5.1, manager: 'Mai Tran', status: 'active' },
 ]
 
 export const UNITS = [
-  { id: 'A-104', size: 5, sqft: 25, floor: 1, type: 'Small', price: 89, climate: true, status: 'available', facility: 'Downtown Storage' },
-  { id: 'B-208', size: 10, sqft: 100, floor: 2, type: 'Medium', price: 149, climate: true, status: 'occupied', facility: 'Downtown Storage' },
-  { id: 'C-301', size: 20, sqft: 400, floor: 3, type: 'Large', price: 269, climate: false, status: 'available', facility: 'Downtown Storage' },
-  { id: 'A-115', size: 5, sqft: 25, floor: 1, type: 'Small', price: 85, climate: false, status: 'reserved', facility: 'Riverside Storage' },
-  { id: 'R-106', size: 5, sqft: 25, floor: 1, type: 'Small', price: 75, climate: false, status: 'available', facility: 'Riverside Storage' },
-  { id: 'R-214', size: 10, sqft: 100, floor: 2, type: 'Medium', price: 135, climate: false, status: 'available', facility: 'Riverside Storage' },
-  { id: 'R-305', size: 20, sqft: 400, floor: 3, type: 'Large', price: 245, climate: true, status: 'available', facility: 'Riverside Storage' },
-  { id: 'B-112', size: 10, sqft: 100, floor: 1, type: 'Medium', price: 155, climate: true, status: 'available', facility: 'Downtown Storage' },
-  { id: 'D-402', size: 25, sqft: 500, floor: 4, type: 'Extra Large', price: 349, climate: true, status: 'occupied', facility: 'Downtown Storage' },
+  { id: 'HCM-F01-S-001', size: 5, sqft: 25, floor: 1, type: 'Small', price: 89, climate: true, status: 'available', facility: 'Downtown Storage' },
+  { id: 'HCM-F01-S-002', size: 5, sqft: 25, floor: 1, type: 'Small', price: 89, climate: true, status: 'available', facility: 'Downtown Storage' },
+  { id: 'HCM-F01-M-001', size: 10, sqft: 100, floor: 2, type: 'Medium', price: 149, climate: true, status: 'occupied', facility: 'Downtown Storage' },
+  { id: 'HCM-F01-M-002', size: 10, sqft: 100, floor: 2, type: 'Medium', price: 155, climate: true, status: 'available', facility: 'Downtown Storage' },
+  { id: 'HCM-F01-L-001', size: 20, sqft: 400, floor: 3, type: 'Large', price: 269, climate: false, status: 'available', facility: 'Downtown Storage' },
+  { id: 'HCM-F01-XL-001', size: 25, sqft: 500, floor: 4, type: 'Extra Large', price: 349, climate: true, status: 'occupied', facility: 'Downtown Storage' },
+  { id: 'BD-F02-S-001', size: 5, sqft: 25, floor: 1, type: 'Small', price: 75, climate: false, status: 'available', facility: 'Riverside Storage' },
+  { id: 'BD-F02-S-002', size: 5, sqft: 25, floor: 1, type: 'Small', price: 85, climate: false, status: 'reserved', facility: 'Riverside Storage' },
+  { id: 'BD-F02-M-001', size: 10, sqft: 100, floor: 2, type: 'Medium', price: 135, climate: false, status: 'available', facility: 'Riverside Storage' },
+  { id: 'BD-F02-L-001', size: 20, sqft: 400, floor: 3, type: 'Large', price: 245, climate: true, status: 'available', facility: 'Riverside Storage' },
+  { id: 'BD-F02-XL-001', size: 25, sqft: 500, floor: 4, type: 'Extra Large', price: 329, climate: true, status: 'available', facility: 'Riverside Storage' },
 ]
 
 export const MY_RENTALS = [
-  { id: 'rent-001', unit: 'B-208', facility: 'Downtown Storage', size: 10, status: 'active', paid: true, amount: 149, startDate: 'Jan 12, 2026', nextDue: 'Oct 12, 2026' },
-  { id: 'rent-002', unit: 'A-104', facility: 'Downtown Storage', size: 5, status: 'active', paid: false, amount: 89, startDate: 'Feb 01, 2026', nextDue: 'Sep 25, 2026' }
+  { id: 'rent-001', unit: 'HCM-F01-M-001', facility: 'Downtown Storage', size: 10, status: 'active', paid: true, amount: 149, startDate: 'Jan 12, 2026', nextDue: 'Oct 12, 2026' },
+  { id: 'rent-002', unit: 'HCM-F01-S-001', facility: 'Downtown Storage', size: 5, status: 'active', paid: false, amount: 89, startDate: 'Feb 01, 2026', nextDue: 'Sep 25, 2026' }
 ]
 
 export const PAYMENTS = [
-  { id: 'INV-2026-0081', date: 'Sep 12, 2026', description: 'Unit B-208 · September rent', method: 'Visa ending 4242', amount: 149, status: 'paid' },
-  { id: 'INV-2026-0070', date: 'Aug 12, 2026', description: 'Unit B-208 · August rent', method: 'Visa ending 4242', amount: 149, status: 'paid' },
-  { id: 'INV-2026-0062', date: 'Jul 12, 2026', description: 'Unit B-208 · July rent', method: 'Visa ending 4242', amount: 149, status: 'paid' },
+  { id: 'INV-2026-0081', date: 'Sep 12, 2026', description: 'Unit HCM-F01-M-001 · September rent', method: 'Visa ending 4242', amount: 149, status: 'paid' },
+  { id: 'INV-2026-0070', date: 'Aug 12, 2026', description: 'Unit HCM-F01-M-001 · August rent', method: 'Visa ending 4242', amount: 149, status: 'paid' },
+  { id: 'INV-2026-0062', date: 'Jul 12, 2026', description: 'Unit HCM-F01-M-001 · July rent', method: 'Visa ending 4242', amount: 149, status: 'paid' },
 ]
 
 export interface TicketMessage {
@@ -241,7 +243,7 @@ export const RENTALS: RentalRecord[] = [
     tenant: 'Demo Customer',
     email: 'customer@storagehub.demo',
     phone: '+84 908 123 456',
-    unit: 'B-208',
+    unit: 'HCM-F01-M-001',
     unitType: 'Medium Climate',
     size: 10,
     facility: 'Downtown Storage',
@@ -263,7 +265,7 @@ export const RENTALS: RentalRecord[] = [
     tenant: 'Tran Van Binh',
     email: 'binh.tran@email.com',
     phone: '+84 912 345 678',
-    unit: 'A-210',
+    unit: 'HCM-F01-S-002',
     unitType: 'Small Standard',
     size: 5,
     facility: 'Downtown Storage',
@@ -285,7 +287,7 @@ export const RENTALS: RentalRecord[] = [
     tenant: 'Nguyen Minh Anh',
     email: 'anh.nguyen@outlook.com',
     phone: '+84 903 555 123',
-    unit: 'A-104',
+    unit: 'HCM-F01-S-001',
     unitType: 'Small Climate',
     size: 5,
     facility: 'Downtown Storage',
@@ -307,7 +309,7 @@ export const RENTALS: RentalRecord[] = [
     tenant: 'Le Hoang Nam',
     email: 'nam.le@gmail.com',
     phone: '+84 988 776 655',
-    unit: 'C-301',
+    unit: 'HCM-F01-L-001',
     unitType: 'Large Storage',
     size: 20,
     facility: 'Downtown Storage',
@@ -329,7 +331,7 @@ export const RENTALS: RentalRecord[] = [
     tenant: 'Saigon Logistics Co.',
     email: 'contact@sg-logistics.vn',
     phone: '+84 28 3822 9999',
-    unit: 'D-402',
+    unit: 'HCM-F01-XL-001',
     unitType: 'Extra Large Commercial',
     size: 25,
     facility: 'Downtown Storage',
@@ -351,7 +353,7 @@ export const RENTALS: RentalRecord[] = [
     tenant: 'Doan Thi Mai',
     email: 'mai.doan@gmail.com',
     phone: '+84 977 112 233',
-    unit: 'A-115',
+    unit: 'BD-F02-S-001',
     unitType: 'Small Standard',
     size: 5,
     facility: 'Riverside Storage',
@@ -373,7 +375,7 @@ export const RENTALS: RentalRecord[] = [
     tenant: 'Vuong Quoc Tuan',
     email: 'tuan.vuong@vcorp.vn',
     phone: '+84 909 888 222',
-    unit: 'B-108',
+    unit: 'BD-F02-M-001',
     unitType: 'Medium Standard',
     size: 10,
     facility: 'Riverside Storage',
