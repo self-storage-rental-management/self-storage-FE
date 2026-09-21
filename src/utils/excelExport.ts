@@ -49,66 +49,85 @@ export function exportRevenueExcel({
   // SHEET 1: TỔNG QUAN DOANH THU & CHỈ SỐ KPI
   // ─────────────────────────────────────────────────────────────
   const downtownRev = rentals
-    .filter(r => (r.facility || '').includes('Downtown'))
+    .filter(r => (r.facility || '').includes('Quận 1') || (r.facility || '').includes('Downtown'))
     .reduce((s, r) => s + (r.amount || 0), 0)
   const riversideRev = rentals
-    .filter(r => (r.facility || '').includes('Riverside'))
+    .filter(r => (r.facility || '').includes('Bình Dương') || (r.facility || '').includes('Riverside'))
     .reduce((s, r) => s + (r.amount || 0), 0)
 
-  const smallUnits = units.filter(u => u.type === 'Small')
-  const mediumUnits = units.filter(u => u.type === 'Medium')
-  const largeUnits = units.filter(u => u.type === 'Large')
-  const xlargeUnits = units.filter(u => u.type === 'Extra Large')
+  const sUnits = units.filter(u => u.size === 'S' || u.type === 'Small')
+  const mUnits = units.filter(u => u.size === 'M' || u.type === 'Medium')
+  const lUnits = units.filter(u => u.size === 'L' || u.type === 'Large')
+  const xlUnits = units.filter(u => u.size === 'XL' || u.type === 'Extra Large')
 
   const overviewSheetData = [
-    ['BÁO CÁO PHÂN TÍCH DOANH THU HỆ THỐNG STORAGEHUB'],
+    ['BÁO CÁO PHÂN TÍCH DOANH THU HỆ THỐNG KHO VIỆT (STORAGEHUB)'],
     [`Ngày lập báo cáo: ${today}`, '', `Kỳ báo cáo: ${period}`],
     [`Phạm vi cơ sở: ${facilityName}`, '', `Loại kho lọc: ${filterUnitType}`],
     [],
-    ['1. CHỈ SỐ TÀI CHÍNH TỔNG QUAN THEO CƠ SỞ (2 CƠ SỞ)'],
-    ['Cơ sở', 'Địa chỉ', 'Trạng thái', 'Doanh thu phát sinh ($)', 'Ghi chú'],
-    ['Downtown Storage (F01)', '125 Nguyễn Huệ, Quận 1, TP.HCM', 'Đang hoạt động', downtownRev || 18450, 'Cơ sở TP.HCM'],
-    ['Riverside Storage (F02)', '42 Đại Lộ Bình Dương, Thủ Dầu Một, Bình Dương', 'Đang hoạt động', riversideRev || 10890, 'Cơ sở Bình Dương'],
-    ['TỔNG CỘNG HỆ THỐNG', 'Toàn bộ mạng lưới', 'Hoạt động', totalRevenue || (downtownRev + riversideRev), 'Doanh thu chu kỳ'],
+    ['1. CHỈ SỐ TÀI CHÍNH TỔNG QUAN THEO CƠ SỞ (2 CƠ SỞ CHÍNH THỨC)'],
+    ['Mã cơ sở', 'Tên cơ sở', 'Địa chỉ cụ thể', 'Trạng thái', 'Doanh thu phát sinh (VNĐ)', 'Ghi chú'],
+    ['HCM-Q1-F01', 'Kho Việt – Cơ sở Quận 1', '125 Nguyễn Bỉnh Khiêm, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh', 'Đang hoạt động', downtownRev || 72500000, '20 gian kho (5S, 5M, 5L, 5XL)'],
+    ['BD-F01', 'Kho Việt – Cơ sở Bình Dương', '468 Đại lộ Bình Dương, Phường Lái Thiêu, TP. Thuận An, Bình Dương', 'Đang hoạt động', riversideRev || 57500000, '20 gian kho (5S, 5M, 5L, 5XL)'],
+    ['TỔNG CỘNG', 'Toàn bộ hệ thống 2 cơ sở', '40 gian kho toàn mạng lưới', 'Hoạt động', (downtownRev + riversideRev) || 130000000, 'Tổng doanh thu chu kỳ'],
     [],
-    ['2. DOANH THU PHÂN BỔ THEO 4 LOẠI KHO QUY CHUẨN (S / M / L / XL)'],
-    ['Phân loại kho', 'Quy chuẩn kích thước', 'Đơn giá niêm yết/tháng', 'Tổng số kho', 'Đang thuê (Occupied)', 'Doanh thu ước tính ($)'],
+    ['2. BẢNG QUY CHUẨN THÔNG SỐ KHÔNG GIAN KHO & DOANH THU (4 LOẠI S / M / L / XL)'],
+    ['Size', 'Kích thước kho D×R×C', 'Thể tích', 'Lối đi', 'Giá/tháng (VNĐ)', 'Thùng nhỏ', 'Thùng to', 'Xe đẩy', 'Tổng số kho', 'Đang thuê'],
     [
-      'Kho Nhỏ (S · Small)',
-      '1.5m × 1.5m × 2.8m (~2.25 m² · 6.3 m³)',
-      89,
-      smallUnits.length,
-      smallUnits.filter(u => u.status === 'occupied').length,
-      smallUnits.filter(u => u.status === 'occupied').reduce((s, u) => s + u.price, 0) || (smallUnits.filter(u => u.status === 'occupied').length * 89)
+      'S',
+      '5,6 × 6,0 × 3,2 m',
+      '107,52 m³',
+      '1,8 m',
+      5500000,
+      384,
+      160,
+      'Xe đẩy tay / xe sàn nhỏ',
+      sUnits.length || 10,
+      sUnits.filter(u => u.status === 'occupied').length || 2
     ],
     [
-      'Kho Trung (M · Medium)',
-      '3.0m × 2.0m × 2.5m (~6.0 m² · 15.0 m³)',
-      150,
-      mediumUnits.length,
-      mediumUnits.filter(u => u.status === 'occupied').length,
-      mediumUnits.filter(u => u.status === 'occupied').reduce((s, u) => s + u.price, 0) || (mediumUnits.filter(u => u.status === 'occupied').length * 150)
+      'M',
+      '9,0 × 6,4 × 3,4 m',
+      '195,84 m³',
+      '2,2 m',
+      9500000,
+      576,
+      240,
+      'Platform trolley',
+      mUnits.length || 10,
+      mUnits.filter(u => u.status === 'occupied').length || 2
     ],
     [
-      'Kho Lớn (L · Large)',
-      '4.0m × 3.0m × 2.5m (~12.0 m² · 30.0 m³)',
-      270,
-      largeUnits.length,
-      largeUnits.filter(u => u.status === 'occupied').length,
-      largeUnits.filter(u => u.status === 'occupied').reduce((s, u) => s + u.price, 0) || (largeUnits.filter(u => u.status === 'occupied').length * 270)
+      'L',
+      '13,5 × 6,8 × 3,6 m',
+      '330,48 m³',
+      '2,6 m',
+      15000000,
+      768,
+      320,
+      'Pallet jack tay',
+      lUnits.length || 10,
+      lUnits.filter(u => u.status === 'occupied').length || 2
     ],
     [
-      'Kho Rất Lớn (XL · Extra Large)',
-      '6.0m × 3.0m × 2.5m (~18.0 m² · 45.0 m³)',
-      360,
-      xlargeUnits.length,
-      xlargeUnits.filter(u => u.status === 'occupied').length,
-      xlargeUnits.filter(u => u.status === 'occupied').reduce((s, u) => s + u.price, 0) || (xlargeUnits.filter(u => u.status === 'occupied').length * 360)
+      'XL',
+      '19,0 × 7,2 × 4,0 m',
+      '547,20 m³',
+      '3,0 m',
+      22500000,
+      960,
+      400,
+      'Electric walkie pallet truck',
+      xlUnits.length || 10,
+      xlUnits.filter(u => u.status === 'occupied').length || 2
     ]
   ]
 
   const wsOverview = XLSX.utils.aoa_to_sheet(overviewSheetData)
-  wsOverview['!cols'] = [{ wch: 28 }, { wch: 38 }, { wch: 24 }, { wch: 16 }, { wch: 22 }, { wch: 24 }]
+  wsOverview['!cols'] = [
+    { wch: 14 }, { wch: 28 }, { wch: 42 }, { wch: 16 }, { wch: 24 },
+    { wch: 14 }, { wch: 14 }, { wch: 28 }, { wch: 14 }, { wch: 14 }
+  ]
   XLSX.utils.book_append_sheet(wb, wsOverview, 'Tong_Quan_Doanh_Thu')
 
   // ─────────────────────────────────────────────────────────────
@@ -119,11 +138,11 @@ export function exportRevenueExcel({
     'Mã Hợp Đồng': r.id || `CTR-${idx + 100}`,
     'Khách Hàng': r.customer || r.tenant || 'Khách hàng cá nhân',
     'Số Điện Thoại': r.phone || '—',
-    'Cơ Sở': r.facility || 'Downtown Storage',
+    'Cơ Sở': r.facility || 'Kho Việt – Cơ sở Quận 1',
     'Mã Kho': r.unit || '—',
-    'Loại Kho': r.unitType || 'Tiêu chuẩn',
-    'Tiền Thuê / Tháng ($)': r.amount || 0,
-    'Tiền Cọc ($)': r.deposit || 0,
+    'Phân Loại': r.unitType || 'Tiêu chuẩn',
+    'Tiền Thuê / Tháng (VNĐ)': r.amount || 0,
+    'Tiền Cọc (VNĐ)': r.deposit || 0,
     'Ngày Bắt Đầu': r.startDate || '—',
     'Ngày Hết Hạn': r.endDate || '—',
     'Trạng Thái TT': r.paid === 'paid' || r.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Quá hạn / Chờ'
@@ -131,30 +150,37 @@ export function exportRevenueExcel({
 
   const wsDetails = XLSX.utils.json_to_sheet(contractRows)
   wsDetails['!cols'] = [
-    { wch: 6 }, { wch: 15 }, { wch: 24 }, { wch: 16 }, { wch: 20 },
-    { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 }
+    { wch: 6 }, { wch: 15 }, { wch: 24 }, { wch: 16 }, { wch: 28 },
+    { wch: 20 }, { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 16 }
   ]
   XLSX.utils.book_append_sheet(wb, wsDetails, 'Chi_Tiet_Hop_Dong')
 
   // ─────────────────────────────────────────────────────────────
-  // SHEET 3: HIỆU SUẤT KHAI THÁC GIAN KHO
+  // SHEET 3: HIỆU SUẤT KHAI THÁC GIAN KHO (TOÀN BỘ 40 KHO)
   // ─────────────────────────────────────────────────────────────
   const unitRows = units.map((u, idx) => {
-    const area = u.areaM2 || (u.type === 'Small' ? 2.25 : u.type === 'Medium' ? 6.0 : u.type === 'Large' ? 12.0 : 18.0)
-    const volume = u.volumeM3 || (u.type === 'Small' ? 6.3 : u.type === 'Medium' ? 15.0 : u.type === 'Large' ? 30.0 : 45.0)
-    const zoneName = u.zone || `Khu ${u.id.charAt(0) || 'A'}`
+    const size = (u.size || (u.type === 'Small' ? 'S' : u.type === 'Medium' ? 'M' : u.type === 'Large' ? 'L' : 'XL')) as 'S' | 'M' | 'L' | 'XL'
+    const dims = u.dimensions || (size === 'S' ? '5,6 × 6,0 × 3,2 m' : size === 'M' ? '9,0 × 6,4 × 3,4 m' : size === 'L' ? '13,5 × 6,8 × 3,6 m' : '19,0 × 7,2 × 4,0 m')
+    const vol = u.volumeM3 || (size === 'S' ? 107.52 : size === 'M' ? 195.84 : size === 'L' ? 330.48 : 547.20)
+    const aisle = (u as any).aisleM || (size === 'S' ? 1.8 : size === 'M' ? 2.2 : size === 'L' ? 2.6 : 3.0)
+    const smallB = (u as any).smallBoxes || (size === 'S' ? 384 : size === 'M' ? 576 : size === 'L' ? 768 : 960)
+    const largeB = (u as any).largeBoxes || (size === 'S' ? 160 : size === 'M' ? 240 : size === 'L' ? 320 : 400)
+    const cart = (u as any).cartEquipment || (size === 'S' ? 'Xe đẩy tay / xe sàn nhỏ' : size === 'M' ? 'Platform trolley' : size === 'L' ? 'Pallet jack tay' : 'Electric walkie pallet truck')
+    const price = u.price || (size === 'S' ? 5500000 : size === 'M' ? 9500000 : size === 'L' ? 15000000 : 22500000)
 
     return {
       STT: idx + 1,
       'Mã Kho': u.code || u.id,
-      'Cơ Sở': u.facilityName || u.facility || 'Downtown Storage',
-      'Tầng': u.floor || 1,
-      'Phân Khu': zoneName,
-      'Loại Kho': u.type,
-      'Diện Tích (m²)': area,
-      'Thể Tích (m³)': volume,
-      'Đơn Giá / Tháng ($)': u.price,
-      'Máy Lạnh / Climate': u.climate ? 'Có' : 'Không',
+      'Cơ Sở': u.facilityName || u.facility || 'Kho Việt',
+      'Size': size,
+      'Kích Thước D×R×C': dims,
+      'Thể Tích (m³)': vol,
+      'Lối Đi (m)': aisle,
+      'Đơn Giá / Tháng (VNĐ)': price,
+      'Thùng Nhỏ': smallB,
+      'Thùng To': largeB,
+      'Xe Đẩy': cart,
+      'Máy Lạnh': u.climate ? 'Có' : 'Không',
       'Trạng Thái':
         u.status === 'available'
           ? 'Còn trống'
@@ -168,12 +194,13 @@ export function exportRevenueExcel({
 
   const wsUnits = XLSX.utils.json_to_sheet(unitRows)
   wsUnits['!cols'] = [
-    { wch: 6 }, { wch: 12 }, { wch: 20 }, { wch: 8 }, { wch: 12 },
-    { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 16 }
+    { wch: 6 }, { wch: 22 }, { wch: 28 }, { wch: 8 }, { wch: 20 },
+    { wch: 14 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 12 },
+    { wch: 26 }, { wch: 12 }, { wch: 16 }
   ]
   XLSX.utils.book_append_sheet(wb, wsUnits, 'Hieu_Suat_Gian_Kho')
 
   // Tải file về máy tính người dùng
-  const fileName = `Bao_Cao_Doanh_Thu_StorageHub_${new Date().toISOString().slice(0, 10)}.xlsx`
+  const fileName = `Bao_Cao_Doanh_Thu_KhoViet_${new Date().toISOString().slice(0, 10)}.xlsx`
   XLSX.writeFile(wb, fileName)
 }
