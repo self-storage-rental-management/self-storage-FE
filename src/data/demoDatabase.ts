@@ -6,20 +6,20 @@ export const FACILITIES = [
 ]
 
 export const UNITS = [
-  { id: 'A-104', areaM2: 2.25, volumeM3: 6.3, floor: 1, type: 'Small', price: 89, climate: true, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 1.5, widthM: 1.5, heightM: 2.8 } },
-  { id: 'B-208', areaM2: 6.0, volumeM3: 15.0, floor: 2, type: 'Medium', price: 149, climate: true, status: 'occupied', facility: 'Downtown Storage', dimensions: { lengthM: 3.0, widthM: 2.0, heightM: 2.5 } },
-  { id: 'C-301', areaM2: 12.0, volumeM3: 30.0, floor: 3, type: 'Large', price: 269, climate: false, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 4.0, widthM: 3.0, heightM: 2.5 } },
-  { id: 'A-115', areaM2: 2.25, volumeM3: 6.3, floor: 1, type: 'Small', price: 85, climate: false, status: 'reserved', facility: 'Riverside Storage', dimensions: { lengthM: 1.5, widthM: 1.5, heightM: 2.8 } },
-  { id: 'R-106', areaM2: 2.25, volumeM3: 6.3, floor: 1, type: 'Small', price: 75, climate: false, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 1.5, widthM: 1.5, heightM: 2.8 } },
-  { id: 'R-214', areaM2: 6.0, volumeM3: 15.0, floor: 2, type: 'Medium', price: 135, climate: false, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 3.0, widthM: 2.0, heightM: 2.5 } },
-  { id: 'R-305', areaM2: 12.0, volumeM3: 30.0, floor: 3, type: 'Large', price: 245, climate: true, status: 'available', facility: 'Riverside Storage', dimensions: { lengthM: 4.0, widthM: 3.0, heightM: 2.5 } },
-  { id: 'B-112', areaM2: 6.0, volumeM3: 15.0, floor: 1, type: 'Medium', price: 155, climate: true, status: 'available', facility: 'Downtown Storage', dimensions: { lengthM: 3.0, widthM: 2.0, heightM: 2.5 } },
-  { id: 'D-402', areaM2: 18.0, volumeM3: 45.0, floor: 4, type: 'Extra Large', price: 349, climate: true, status: 'occupied', facility: 'Downtown Storage', dimensions: { lengthM: 6.0, widthM: 3.0, heightM: 2.5 } },
+  { id: 'A-104', size: 5, sqft: 25, floor: 1, type: 'Small', price: 89, climate: true, status: 'available', facility: 'Downtown Storage' },
+  { id: 'B-208', size: 10, sqft: 100, floor: 2, type: 'Medium', price: 149, climate: true, status: 'occupied', facility: 'Downtown Storage' },
+  { id: 'C-301', size: 20, sqft: 400, floor: 3, type: 'Large', price: 269, climate: false, status: 'available', facility: 'Downtown Storage' },
+  { id: 'A-115', size: 5, sqft: 25, floor: 1, type: 'Small', price: 85, climate: false, status: 'reserved', facility: 'Riverside Storage' },
+  { id: 'R-106', size: 5, sqft: 25, floor: 1, type: 'Small', price: 75, climate: false, status: 'available', facility: 'Riverside Storage' },
+  { id: 'R-214', size: 10, sqft: 100, floor: 2, type: 'Medium', price: 135, climate: false, status: 'available', facility: 'Riverside Storage' },
+  { id: 'R-305', size: 20, sqft: 400, floor: 3, type: 'Large', price: 245, climate: true, status: 'available', facility: 'Riverside Storage' },
+  { id: 'B-112', size: 10, sqft: 100, floor: 1, type: 'Medium', price: 155, climate: true, status: 'available', facility: 'Downtown Storage' },
+  { id: 'D-402', size: 25, sqft: 500, floor: 4, type: 'Extra Large', price: 349, climate: true, status: 'occupied', facility: 'Downtown Storage' },
 ]
 
 export const MY_RENTALS = [
-  { id: 'rent-001', unit: 'B-208', facility: 'Downtown Storage', areaM2: 6.0, status: 'active', paid: true, amount: 149, startDate: 'Jan 12, 2026', nextDue: 'Oct 12, 2026' },
-  { id: 'rent-002', unit: 'A-104', facility: 'Downtown Storage', areaM2: 2.25, status: 'active', paid: false, amount: 89, startDate: 'Feb 01, 2026', nextDue: 'Sep 25, 2026' }
+  { id: 'rent-001', unit: 'B-208', facility: 'Downtown Storage', size: 10, status: 'active', paid: true, amount: 149, startDate: 'Jan 12, 2026', nextDue: 'Oct 12, 2026' },
+  { id: 'rent-002', unit: 'A-104', facility: 'Downtown Storage', size: 5, status: 'active', paid: false, amount: 89, startDate: 'Feb 01, 2026', nextDue: 'Sep 25, 2026' }
 ]
 
 export const PAYMENTS = [
@@ -527,12 +527,44 @@ export const CONVERSION_DATA = [
   { month: 'Sep', visits: 760, bookings: 84 }
 ]
 
-export const PRICING_TIERS = [
-  { id: 'tier-1', name: 'Nhỏ (Small)', type: 'Small', sizes: '2.25 m² (6.3 m³)', size: '2.25 m²', basePrice: 89, climateAdder: 20, highDemandMultiplier: 1.15, facility: 'All facilities' },
-  { id: 'tier-2', name: 'Vừa (Medium)', type: 'Medium', sizes: '6.0 m² (15.0 m³)', size: '6.0 m²', basePrice: 150, climateAdder: 30, highDemandMultiplier: 1.2, facility: 'All facilities' },
-  { id: 'tier-3', name: 'Lớn (Large)', type: 'Large', sizes: '12.0 m² (30.0 m³)', size: '12.0 m²', basePrice: 270, climateAdder: 45, highDemandMultiplier: 1.25, facility: 'All facilities' },
-  { id: 'tier-4', name: 'Cực lớn (Extra Large)', type: 'Extra Large', sizes: '18.0 m² (45.0 m³)', size: '18.0 m²', basePrice: 360, climateAdder: 50, highDemandMultiplier: 1.3, facility: 'All facilities' }
-]
+// export const PRICING_TIERS = [
+//   { id: 'tier-1', name: 'Small Unit', size: '5 ft (25 sq ft)', basePrice: 89, climateAdder: 20, highDemandMultiplier: 1.15, facility: 'All facilities' },
+//   { id: 'tier-2', name: 'Medium Unit', size: '10 ft (100 sq ft)', basePrice: 149, climateAdder: 30, highDemandMultiplier: 1.2, facility: 'All facilities' },
+//   { id: 'tier-3', name: 'Large Unit', size: '20 ft (400 sq ft)', basePrice: 269, climateAdder: 45, highDemandMultiplier: 1.25, facility: 'All facilities' }
+// ]
+
+export const PRICING_TIERS =
+  [
+    {
+      id: 'tier-1',
+      name: 'Small Unit',
+      size: '7,500,000 cm³',
+      basePrice: 89,
+      climateAdder: 20,
+      highDemandMultiplier: 1.15,
+      facility: 'All facilities'
+    },
+
+    {
+      id: 'tier-2',
+      name: 'Medium Unit',
+      size: '18,750,000 cm³',
+      basePrice: 149,
+      climateAdder: 30,
+      highDemandMultiplier: 1.2,
+      facility: 'All facilities'
+    },
+
+    {
+      id: 'tier-3',
+      name: 'Large Unit',
+      size: '60,000,000 cm³',
+      basePrice: 269,
+      climateAdder: 45,
+      highDemandMultiplier: 1.25,
+      facility: 'All facilities'
+    }
+  ];
 
 export interface PromotionItem {
   id: string
@@ -652,89 +684,19 @@ export const DISCOUNTS: PromotionItem[] = [
   }
 ]
 
-export interface PolicyItem {
-  id: string
-  name: string
-  value: string
-  scope: string
-  description: string
-  descriptionVi: string
-  editable: boolean
-  status: 'active' | 'draft' | 'archived'
-}
+// export const POLICIES = [
+//   { id: 'pol-1', name: 'Standard monthly rental', description: 'Month-to-month rental with 30-day notice.', status: 'active' },
+//   { id: 'pol-2', name: 'Annual corporate lease', description: '12-month fixed commitment with discounted base rate.', status: 'active' }
+// ]
 
-export const POLICIES: PolicyItem[] = [
-  {
-    id: 'pol-1',
-    name: 'Grace Period',
-    value: '7 days',
-    scope: 'All Facilities',
-    description: 'Debt grace period before late fees are charged or electronic gate access is suspended.',
-    descriptionVi: 'Thời gian gia hạn nợ trước khi tính phí phạt trễ hạn hoặc áp dụng khóa cổng điện tử.',
-    editable: true,
-    status: 'active'
-  },
-  {
-    id: 'pol-2',
-    name: 'Late Fee',
-    value: '$25.00',
-    scope: 'All Facilities',
-    description: 'Fixed late fee applied automatically after the payment grace period ends.',
-    descriptionVi: 'Mức phí phạt cố định áp dụng tự động sau khi kết thúc thời gian gia hạn thanh toán.',
-    editable: true,
-    status: 'active'
-  },
-  {
-    id: 'pol-3',
-    name: 'Security Deposit',
-    value: '1 month',
-    scope: 'All Facilities',
-    description: 'Security deposit retained during the lease and refunded in full within 24 hours when the unit is returned undamaged.',
-    descriptionVi: 'Tiền đặt cọc an ninh, bảo lưu và hoàn trả 100% trong 24h khi khách trả kho nguyên vẹn.',
-    editable: true,
-    status: 'active'
-  },
-  {
-    id: 'pol-4',
-    name: 'Notice to Vacate',
-    value: '15 days',
-    scope: 'All Facilities',
-    description: 'Minimum notice the tenant must provide before vacating at the end of the lease term.',
-    descriptionVi: 'Thời hạn tối thiểu khách hàng cần gửi yêu cầu thông báo trả kho trước khi hết kỳ thuê.',
-    editable: true,
-    status: 'active'
-  },
-  {
-    id: 'pol-5',
-    name: 'Minimum Lease',
-    value: '1 month',
-    scope: 'All Facilities',
-    description: 'Minimum storage-unit lease term applied to all individual customers.',
-    descriptionVi: 'Thời hạn hợp đồng thuê gian kho tối thiểu được áp dụng cho toàn bộ khách hàng cá nhân.',
-    editable: true,
-    status: 'active'
-  },
-  {
-    id: 'pol-6',
-    name: 'Hold Reservation TTL',
-    value: '24 hours',
-    scope: 'All Facilities',
-    description: 'The storage unit is held for 24 hours while the customer completes verification and pays the deposit.',
-    descriptionVi: 'Thời gian giữ khóa kho tạm thời 24h để khách hàng hoàn tất xác minh và đóng tiền cọc.',
-    editable: true,
-    status: 'active'
-  },
-  {
-    id: 'pol-7',
-    name: 'Digital Gate Access',
-    value: '24/7 Access',
-    scope: 'All Facilities',
-    description: '24/7 facility access using a personalized digital PIN issued after the deposit is paid.',
-    descriptionVi: 'Quyền ra vào cơ sở 24/7 bằng mã PIN số cá nhân hóa được cấp ngay sau khi thanh toán cọc.',
-    editable: false,
-    status: 'active'
-  }
+export const POLICIES = [
+  { id: 'pol-1', name: 'Grace Period', value: '5 days', scope: 'All Facilities', editable: true },
+  { id: 'pol-2', name: 'Late Fee', value: '$25 / month', scope: 'All Facilities', editable: true },
+  { id: 'pol-3', name: 'Security Deposit', value: '1 month', scope: 'All Facilities', editable: true },
+  { id: 'pol-4', name: 'Notice to Vacate', value: '15 days', scope: 'All Facilities', editable: true },
+  { id: 'pol-5', name: 'Minimum Lease', value: '1 month', scope: 'All Facilities', editable: true }
 ]
+
 
 export const FEES = [
   { type: 'Late payment fee', amount: '$25.00', trigger: 'Applied automatically 5 days after payment due date', applies: 'All tenants' },
